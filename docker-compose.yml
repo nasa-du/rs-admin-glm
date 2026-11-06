@@ -1,0 +1,12 @@
+# Development compose — database only (docs/spec.md §9.1).
+# Backend runs on the host via `cargo run`; frontend via `npm run dev`.
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: rs_admin
+      POSTGRES_PASSWORD: rs_admin
+      POSTGRES_DB: rs_admin
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql]
+volumes: { pgdata: {} }

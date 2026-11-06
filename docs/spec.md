@@ -341,9 +341,12 @@ services:
       POSTGRES_PASSWORD: rs_admin
       POSTGRES_DB: rs_admin
     ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+    volumes: [pgdata:/var/lib/postgresql]
 volumes: { pgdata: {} }
 ```
+
+> postgres 18 镜像改为在 `/var/lib/postgresql` 下按主版本建数据目录，挂载点须为该父目录
+> （挂旧路径 `/var/lib/postgresql/data` 会被 18 镜像拒绝启动）；spec 原文已据此修正。
 
 - 后端：`cargo run`（启动自动 `sqlx::migrate!`），监听 `127.0.0.1:3000`。
 - 前端：`npm run dev`（Vite 5173），proxy `'/api' → http://localhost:3000`。
