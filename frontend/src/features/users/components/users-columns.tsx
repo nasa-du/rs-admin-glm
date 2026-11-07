@@ -1,138 +1,140 @@
+import { useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
+import { useTranslation } from 'react-i18next'
+import { formatDateTime } from '@/lib/date'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import { DataTableColumnHeader } from '@/components/data-table'
 import { LongText } from '@/components/long-text'
-import { callTypes, roles } from '../data/data'
+import { roleOptions, statusBadgeClasses } from '../data/data'
 import { type User } from '../data/schema'
-import { DataTableRowActions } from './data-table-row-actions'
 
-export const usersColumns: ColumnDef<User>[] = [
-  {
-    id: 'select',
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && 'indeterminate')
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label='Select all'
-        className='translate-y-[2px]'
-      />
-    ),
-    meta: {
-      className: cn('max-md:sticky start-0 z-10 rounded-tl-[inherit]'),
-    },
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label='Select row'
-        className='translate-y-[2px]'
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: 'username',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Username' />
-    ),
-    cell: ({ row }) => (
-      <LongText className='max-w-36 ps-3'>{row.getValue('username')}</LongText>
-    ),
-    meta: {
-      className: cn(
-        'drop-shadow-[0_1px_2px_rgb(0_0_0_/_0.1)] dark:drop-shadow-[0_1px_2px_rgb(255_255_255_/_0.1)]',
-        'ps-0.5 max-md:sticky start-6 @4xl/content:table-cell @4xl/content:drop-shadow-none'
-      ),
-    },
-    enableHiding: false,
-  },
-  {
-    id: 'fullName',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Name' />
-    ),
-    cell: ({ row }) => {
-      const { firstName, lastName } = row.original
-      const fullName = `${firstName} ${lastName}`
-      return <LongText className='max-w-36'>{fullName}</LongText>
-    },
-    meta: { className: 'w-36' },
-  },
-  {
-    accessorKey: 'email',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Email' />
-    ),
-    cell: ({ row }) => (
-      <div className='w-fit ps-2 text-nowrap'>{row.getValue('email')}</div>
-    ),
-  },
-  {
-    accessorKey: 'phoneNumber',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Phone Number' />
-    ),
-    cell: ({ row }) => <div>{row.getValue('phoneNumber')}</div>,
-    enableSorting: false,
-  },
-  {
-    accessorKey: 'status',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Status' />
-    ),
-    cell: ({ row }) => {
-      const { status } = row.original
-      const badgeColor = callTypes.get(status)
-      return (
-        <div className='flex space-x-2'>
-          <Badge variant='outline' className={cn('capitalize', badgeColor)}>
-            {row.getValue('status')}
-          </Badge>
-        </div>
-      )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
-    },
-    enableHiding: false,
-    enableSorting: false,
-  },
-  {
-    accessorKey: 'role',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Role' />
-    ),
-    cell: ({ row }) => {
-      const { role } = row.original
-      const userType = roles.find(({ value }) => value === role)
+/**
+ * The users table columns. Labels and dates follow the current UI language
+ * (spec §6.3 / §6.5); the accessor keys are the backend sort vocabulary, so
+ * a header click can write `sort=email.asc` straight into the URL.
+ */
+export function useUsersColumns(): ColumnDef<User>[] {
+  const { t, i18n } = useTranslation()
 
-      if (!userType) {
-        return null
-      }
+  return useMemo(() => {
+    const roleLabel = (role: User['role']) => t(`roles.${role}`)
+    const statusLabel = (enabled: boolean) =>
+      enabled ? t('userStatus.enabled') : t('userStatus.disabled')
 
-      return (
-        <div className='flex items-center gap-x-2'>
-          {userType.icon && (
-            <userType.icon size={16} className='text-muted-foreground' />
-          )}
-          <span className='text-sm capitalize'>{row.getValue('role')}</span>
-        </div>
-      )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
-    },
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    id: 'actions',
-    cell: DataTableRowActions,
-  },
-]
+    return [
+      {
+        accessorKey: 'displayName',
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t('users.columns.displayName')}
+          />
+        ),
+        cell: ({ row }) => (
+          <LongText className='max-w-36 ps-3'>
+            {row.getValue('displayName')}
+          </LongText>
+        ),
+        meta: {
+          title: t('users.columns.displayName'),
+          className: cn(
+            'drop-shadow-[0_1px_2px_rgb(0_0_0_/_0.1)] dark:drop-shadow-[0_1px_2px_rgb(255_255_255_/_0.1)]',
+            'ps-0.5 max-md:sticky start-6 @4xl/content:table-cell @4xl/content:drop-shadow-none'
+          ),
+        },
+        enableHiding: false,
+      },
+      {
+        accessorKey: 'email',
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t('users.columns.email')}
+          />
+        ),
+        cell: ({ row }) => (
+          <div className='w-fit ps-2 text-nowrap'>{row.getValue('email')}</div>
+        ),
+        meta: { title: t('users.columns.email') },
+      },
+      {
+        accessorKey: 'role',
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t('users.columns.role')}
+          />
+        ),
+        cell: ({ row }) => {
+          const role = row.original.role
+          const roleType = roleOptions.find(({ value }) => value === role)
+          return (
+            <div className='flex items-center gap-x-2'>
+              {roleType?.icon && (
+                <roleType.icon size={16} className='text-muted-foreground' />
+              )}
+              <span className='text-sm'>{roleLabel(role)}</span>
+            </div>
+          )
+        },
+        meta: { title: t('users.columns.role') },
+        enableHiding: false,
+      },
+      {
+        accessorKey: 'isEnabled',
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t('users.columns.status')}
+          />
+        ),
+        cell: ({ row }) => {
+          const enabled = row.original.isEnabled
+          return (
+            <Badge
+              variant='outline'
+              className={cn(
+                statusBadgeClasses[enabled ? 'enabled' : 'disabled']
+              )}
+            >
+              {statusLabel(enabled)}
+            </Badge>
+          )
+        },
+        meta: { title: t('users.columns.status') },
+        enableHiding: false,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t('users.columns.createdAt')}
+          />
+        ),
+        cell: ({ row }) => (
+          <div className='text-nowrap'>
+            {formatDateTime(row.original.createdAt, i18n.language)}
+          </div>
+        ),
+        meta: { title: t('users.columns.createdAt') },
+      },
+      {
+        accessorKey: 'updatedAt',
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={t('users.columns.updatedAt')}
+          />
+        ),
+        cell: ({ row }) => (
+          <div className='text-nowrap'>
+            {formatDateTime(row.original.updatedAt, i18n.language)}
+          </div>
+        ),
+        meta: { title: t('users.columns.updatedAt') },
+      },
+    ]
+  }, [t, i18n.language])
+}

@@ -6,6 +6,33 @@
   "languageSwitcher": {
     "label": "Switch language"
   },
+  "nav": {
+    "general": "General",
+    "other": "Other",
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "settings": "Settings",
+    "profile": "Profile",
+    "appearance": "Appearance",
+    "signOut": "Sign out"
+  },
+  "roles": {
+    "superadmin": "Superadmin",
+    "admin": "Admin",
+    "user": "User"
+  },
+  "userStatus": {
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "commandMenu": {
+    "placeholder": "Type a command or search...",
+    "noResults": "No results found.",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
   "toasts": {
     "sessionExpired": "Your session has expired, please sign in again",
     "contentNotModified": "Content not modified"
@@ -31,6 +58,74 @@
     "description": "Are you sure you want to sign out? You will need to sign in again to access your account.",
     "confirm": "Sign out"
   },
+  "users": {
+    "title": "Users",
+    "description": "Manage users and their roles here.",
+    "total": "Total users: {{total}}",
+    "add": "Add User",
+    "searchPlaceholder": "Search email or display name...",
+    "noResults": "No users found.",
+    "filters": {
+      "status": "Status",
+      "role": "Role"
+    },
+    "columns": {
+      "displayName": "Display name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "createdAt": "Created",
+      "updatedAt": "Updated"
+    },
+    "createDialog": {
+      "title": "Add User",
+      "description": "Create a user and hand over the one-time initial password.",
+      "email": "Email",
+      "displayName": "Display name",
+      "role": "Role",
+      "roleHint": "You can only create roles below your own.",
+      "submit": "Create user",
+      "creating": "Creating…",
+      "credentialsTitle": "User created",
+      "createdFor": "Account {{email}} created.",
+      "initialPassword": "Initial password",
+      "copy": "Copy password",
+      "copied": "Password copied",
+      "copyFailed": "Could not copy the password",
+      "shownOnce": "Shown only once. The user must change it at first sign-in; it cannot be recovered.",
+      "done": "Done"
+    },
+    "validation": {
+      "emailRequired": "Please enter an email",
+      "emailInvalid": "Please enter a valid email address",
+      "displayNameRequired": "Please enter a display name",
+      "displayNameTooLong": "Display name must not exceed 32 characters"
+    }
+  },
+  "dataTable": {
+    "reset": "Reset",
+    "view": "View",
+    "toggleColumns": "Toggle columns",
+    "asc": "Asc",
+    "desc": "Desc",
+    "hide": "Hide",
+    "noResults": "No results found.",
+    "selected": "{{n}} selected",
+    "clearFilters": "Clear filters",
+    "rowsPerPage": "Rows per page",
+    "pageOf": "Page {{page}} of {{pages}}",
+    "firstPage": "Go to first page",
+    "previousPage": "Go to previous page",
+    "nextPage": "Go to next page",
+    "lastPage": "Go to last page",
+    "goToPage": "Go to page {{page}}"
+  },
+  "forbidden": {
+    "title": "Access Forbidden",
+    "description": "You don't have the necessary permission to view this resource.",
+    "goBack": "Go Back",
+    "home": "Back to Home"
+  },
   "errors": {
     "INVALID_CREDENTIALS": "Email or password is incorrect",
     "USER_DISABLED": "This account has been disabled. Please contact an administrator.",
@@ -48,6 +143,10 @@
     "PASSWORD_TOO_LONG": "Password must not exceed 128 characters",
     "CURRENT_PASSWORD_INCORRECT": "Current password is incorrect",
     "DISPLAY_NAME_REQUIRED": "Please enter a display name",
-    "DISPLAY_NAME_TOO_LONG": "Display name must not exceed 32 characters"
+    "DISPLAY_NAME_TOO_LONG": "Display name must not exceed 32 characters",
+    "ROLE_INVALID": "Please select a valid role",
+    "SORT_INVALID": "This sort field or direction is not supported",
+    "PAGE_INVALID": "Page must be at least 1",
+    "PAGE_SIZE_INVALID": "Page size must be between 1 and 100"
   }
 }

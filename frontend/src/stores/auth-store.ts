@@ -55,3 +55,14 @@ export const useAuthStore = create<AuthState>()((set) => ({
     }),
   reset: () => set({ user: null, accessToken: '' }),
 }))
+
+/**
+ * The caller's single role, unwrapped from the template's array adapter.
+ * Components subscribe through this selector instead of reaching into
+ * `state.user?.role[0]` at every call site.
+ */
+export const useCurrentRole = () =>
+  useAuthStore((state) => state.user?.role[0])
+
+/** Non-hook accessor for the route guard (which runs outside React). */
+export const getCurrentRole = () => useAuthStore.getState().user?.role[0]

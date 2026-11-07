@@ -168,6 +168,15 @@ impl From<JsonRejection> for AppError {
     }
 }
 
+/// Unparseable query parameters (`?page=abc`, an unknown `status`, a
+/// duplicate single-valued field) take the same 422 shape as a bad JSON
+/// body; the query extractor's default 400 text body is not the contract.
+impl From<axum_extra::extract::QueryRejection> for AppError {
+    fn from(_: axum_extra::extract::QueryRejection) -> Self {
+        Self::ValidationError(FieldErrors::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;

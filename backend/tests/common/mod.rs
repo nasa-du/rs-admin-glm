@@ -8,8 +8,8 @@
 
 use axum::Router;
 use axum::body::Body;
-use axum::http::header::{CONTENT_TYPE, COOKIE, SET_COOKIE};
-use axum::http::{Request, StatusCode};
+use axum::http::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE, SET_COOKIE};
+use axum::http::{Method, Request, StatusCode};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use sqlx::PgPool;
 use tower::ServiceExt;
@@ -144,15 +144,57 @@ pub fn logout_request(cookie: Option<&str>) -> Request<Body> {
     auth_request("/api/auth/logout", cookie, Some(CSRF_VALUE))
 }
 
-/// Sign in and return the refresh plaintext.
-pub async fn sign_in(app: &Router, email: &str) -> String {
+/// Sign in and return `(access token, refresh plaintext)`.
+pub async fn sign_in_session(app: &Router, email: &str) -> (String, String) {
     let response = app
         .clone()
         .oneshot(login_request(email, TEST_PASSWORD))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK, "sign-in precondition");
-    refresh_token(&response)
+    let refresh = refresh_token(&response);
+    let body = body_json(response).await;
+    let access = body["accessToken"]
+        .as_str()
+        .expect("login returns an accessToken")
+        .to_owned();
+    (access, refresh)
+}
+
+/// Sign in and return the refresh plaintext.
+pub async fn sign_in(app: &Router, email: &str) -> String {
+    sign_in_session(app, email).await.1
+}
+
+/// A Bearer-authenticated JSON request (body optional).
+pub fn authenticated_request(
+    method: Method,
+    path: &str,
+    access: &str,
+    body: Option<serde_json::Value>,
+) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(path)
+        .header(AUTHORIZATION, format!("Bearer {access}"));
+    let payload = match body {
+        Some(body) => {
+            builder = builder.header(CONTENT_TYPE, "application/json");
+            Body::from(body.to_string())
+        }
+        None => Body::empty(),
+    };
+    builder.body(payload).unwrap()
+}
+
+/// `GET` with an access token.
+pub fn get_with_token(path: &str, access: &str) -> Request<Body> {
+    authenticated_request(Method::GET, path, access, None)
+}
+
+/// `POST` with an access token and a JSON body.
+pub fn post_json_with_token(path: &str, access: &str, body: serde_json::Value) -> Request<Body> {
+    authenticated_request(Method::POST, path, access, Some(body))
 }
 
 /// Assert the §5.2 error contract: status + `{code, title}` shape.

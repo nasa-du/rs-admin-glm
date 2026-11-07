@@ -6,6 +6,33 @@
   "languageSwitcher": {
     "label": "切换界面语言"
   },
+  "nav": {
+    "general": "通用",
+    "other": "其他",
+    "dashboard": "仪表盘",
+    "users": "用户管理",
+    "settings": "设置",
+    "profile": "个人资料",
+    "appearance": "外观",
+    "signOut": "登出"
+  },
+  "roles": {
+    "superadmin": "超级管理员",
+    "admin": "管理员",
+    "user": "普通用户"
+  },
+  "userStatus": {
+    "enabled": "启用",
+    "disabled": "已禁用"
+  },
+  "commandMenu": {
+    "placeholder": "输入命令或搜索…",
+    "noResults": "没有找到结果。",
+    "theme": "主题",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
   "toasts": {
     "sessionExpired": "会话已过期，请重新登录",
     "contentNotModified": "内容未修改"
@@ -31,6 +58,74 @@
     "description": "确定要登出吗？再次访问需要重新登录。",
     "confirm": "登出"
   },
+  "users": {
+    "title": "用户列表",
+    "description": "在这里管理用户及其角色。",
+    "total": "共 {{total}} 名用户",
+    "add": "新增用户",
+    "searchPlaceholder": "搜索登录标识或显示名…",
+    "noResults": "没有符合条件的用户。",
+    "filters": {
+      "status": "状态",
+      "role": "角色"
+    },
+    "columns": {
+      "displayName": "显示名",
+      "email": "邮箱",
+      "role": "角色",
+      "status": "状态",
+      "createdAt": "创建时间",
+      "updatedAt": "更新时间"
+    },
+    "createDialog": {
+      "title": "新增用户",
+      "description": "创建用户并线下转交一次性初始密码。",
+      "email": "邮箱",
+      "displayName": "显示名",
+      "role": "角色",
+      "roleHint": "只能创建低于自己档位的角色。",
+      "submit": "创建用户",
+      "creating": "创建中…",
+      "credentialsTitle": "用户已创建",
+      "createdFor": "账号 {{email}} 已创建。",
+      "initialPassword": "初始密码",
+      "copy": "复制密码",
+      "copied": "密码已复制",
+      "copyFailed": "无法复制密码，请手动选择",
+      "shownOnce": "只显示这一次。该用户首次登录时必须修改密码，此密码无法找回。",
+      "done": "完成"
+    },
+    "validation": {
+      "emailRequired": "请输入邮箱",
+      "emailInvalid": "邮箱格式不正确",
+      "displayNameRequired": "请输入显示名",
+      "displayNameTooLong": "显示名不能超过 32 个字符"
+    }
+  },
+  "dataTable": {
+    "reset": "重置",
+    "view": "视图",
+    "toggleColumns": "切换列",
+    "asc": "升序",
+    "desc": "降序",
+    "hide": "隐藏",
+    "noResults": "没有找到结果。",
+    "selected": "已选 {{n}} 项",
+    "clearFilters": "清除筛选",
+    "rowsPerPage": "每页行数",
+    "pageOf": "第 {{page}} / {{pages}} 页",
+    "firstPage": "第一页",
+    "previousPage": "上一页",
+    "nextPage": "下一页",
+    "lastPage": "最后一页",
+    "goToPage": "转到第 {{page}} 页"
+  },
+  "forbidden": {
+    "title": "无权访问",
+    "description": "你没有权限查看此页面。",
+    "goBack": "返回上一页",
+    "home": "返回首页"
+  },
   "errors": {
     "INVALID_CREDENTIALS": "邮箱或密码错误",
     "USER_DISABLED": "该账号已被禁用，请联系管理员",
@@ -48,6 +143,10 @@
     "PASSWORD_TOO_LONG": "密码不能超过 128 个字符",
     "CURRENT_PASSWORD_INCORRECT": "当前密码不正确",
     "DISPLAY_NAME_REQUIRED": "请输入显示名",
-    "DISPLAY_NAME_TOO_LONG": "显示名不能超过 32 个字符"
+    "DISPLAY_NAME_TOO_LONG": "显示名不能超过 32 个字符",
+    "ROLE_INVALID": "请选择有效的角色",
+    "SORT_INVALID": "不支持该排序字段或方向",
+    "PAGE_INVALID": "页码必须从 1 开始",
+    "PAGE_SIZE_INVALID": "每页条数必须在 1–100 之间"
   }
 }

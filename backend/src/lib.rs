@@ -10,6 +10,7 @@ pub mod error;
 pub mod password;
 pub mod seed;
 pub mod state;
+pub mod users;
 
 use std::time::Duration;
 
@@ -63,8 +64,11 @@ pub fn app_router(state: AppState, mount_swagger: bool) -> Router {
         .routes(routes!(auth::session::refresh))
         .routes(routes!(auth::session::logout));
 
+    let users_routes = OpenApiRouter::<AppState>::new().routes(routes!(users::list, users::create));
+
     let (router, openapi) = OpenApiRouter::with_openapi(docs::ApiDoc::openapi())
         .nest("/api", auth_routes)
+        .nest("/api", users_routes)
         .split_for_parts();
 
     let app = router.with_state(state).fallback(|| async {

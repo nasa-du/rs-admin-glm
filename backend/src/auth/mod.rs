@@ -6,6 +6,7 @@
 //! HS256 access JWT (15 min) plus the opaque `rs_admin_refresh` cookie
 //! (ADR 0001).
 
+pub mod extractor;
 pub mod jwt;
 pub mod session;
 pub mod tokens;
@@ -29,8 +30,10 @@ use crate::password;
 use crate::state::AppState;
 
 /// The hierarchical single-value role (spec §3): superadmin ⊃ admin ⊃ user.
-/// The wire spelling lives once, in `serde(rename_all)` — the same derive
-/// serves DTOs, the JWT `role` claim, and (via `sqlx::Type`) the DB enum.
+/// `serde(rename_all)` defines the wire spelling for DTOs and the JWT `role`
+/// claim; `from_wire` parses the create request's string so an unknown value
+/// can become a field-level `ROLE_INVALID` 422 instead of a generic
+/// deserialization failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -38,6 +41,43 @@ pub enum Role {
     Superadmin,
     Admin,
     User,
+}
+
+impl Role {
+    /// Hierarchy value from spec §3: superadmin=3, admin=2, user=1.
+    /// `rank()` is the one place the ordering is defined; every RBAC check
+    /// compares ranks rather than spelling out role pairs.
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Superadmin => 3,
+            Self::Admin => 2,
+            Self::User => 1,
+        }
+    }
+
+    /// True when `self` is at or above `minimum` (superadmin ⊃ admin ⊃ user).
+    pub fn at_least(self, minimum: Self) -> bool {
+        self.rank() >= minimum.rank()
+    }
+
+    /// Manage-down (CONTEXT.md): a role may act only on targets strictly
+    /// below itself. Equality is not enough — peers are read-only.
+    pub fn strictly_outranks(self, other: Self) -> bool {
+        self.rank() > other.rank()
+    }
+
+    /// Parse the wire spelling used by the API and the JWT (`superadmin`,
+    /// `admin`, `user`). Returns `None` for anything else so callers can
+    /// answer with a field-level `ROLE_INVALID` instead of a generic
+    /// deserialization failure.
+    pub fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "superadmin" => Some(Self::Superadmin),
+            "admin" => Some(Self::Admin),
+            "user" => Some(Self::User),
+            _ => None,
+        }
+    }
 }
 
 /// `POST /auth/login` request body.
@@ -48,7 +88,8 @@ pub struct LoginRequest {
 }
 
 /// The `User` wire shape (spec §5.1) — camelCase, never leaks the hash.
-#[derive(Debug, Serialize, ToSchema)]
+/// `FromRow` is derived so list / create can `RETURNING` it directly.
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserDto {
     pub id: Uuid,
@@ -201,6 +242,26 @@ mod tests {
         ] {
             assert_eq!(serde_json::to_value(role).unwrap(), wire);
             assert_eq!(serde_json::from_value::<Role>(wire.into()).unwrap(), role);
+            assert_eq!(Role::from_wire(wire), Some(role));
         }
+    }
+
+    #[test]
+    fn hierarchy_is_superadmin_then_admin_then_user() {
+        // Spec §3 pins the rank numbers; every RBAC check compares them.
+        assert_eq!(Role::Superadmin.rank(), 3);
+        assert_eq!(Role::Admin.rank(), 2);
+        assert_eq!(Role::User.rank(), 1);
+
+        assert!(Role::Superadmin.at_least(Role::Admin));
+        assert!(Role::Admin.at_least(Role::Admin));
+        assert!(!Role::User.at_least(Role::Admin));
+
+        // Manage-down is strict: peers are never manageable.
+        assert!(Role::Superadmin.strictly_outranks(Role::Admin));
+        assert!(Role::Admin.strictly_outranks(Role::User));
+        assert!(!Role::Superadmin.strictly_outranks(Role::Superadmin));
+        assert!(!Role::Admin.strictly_outranks(Role::Admin));
+        assert!(!Role::User.strictly_outranks(Role::User));
     }
 }

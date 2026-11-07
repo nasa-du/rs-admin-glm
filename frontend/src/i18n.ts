@@ -28,9 +28,10 @@ void i18n
     },
     supportedLngs: [...SUPPORTED_LANGUAGES],
     fallbackLng: 'zh-CN',
-    // A browser set to plain `zh` resolves to the supported zh-CN; `zh-TW`
-    // etc. fall back to zh-CN as well.
-    nonExplicitSupportedLngs: true,
+    // A browser set to plain `zh` (or `zh-TW`) resolves to the supported
+    // zh-CN through i18next's best-match logic. Do NOT set
+    // `nonExplicitSupportedLngs`: it compares the *base* language (`zh`)
+    // against this list and would reject `zh-CN` itself.
     detection: {
       order: ['localStorage', 'navigator'],
       lookupLocalStorage: LANGUAGE_STORAGE_KEY,

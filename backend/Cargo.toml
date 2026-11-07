@@ -49,8 +49,10 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 # Refresh tokens are stored as SHA-256 hex (spec §2.2)
 sha2 = "0.10"
-# Cookie building (Set-Cookie rs_admin_refresh) + JSON rejection mapping
-axum-extra = { version = "0.10", features = ["cookie"] }
+# Cookie building (Set-Cookie rs_admin_refresh) + JSON rejection mapping.
+# `query` = multi-value query extraction (`role=admin&role=user`) via
+# serde_html_form; axum's built-in Query cannot collect repeated keys.
+axum-extra = { version = "0.10", features = ["cookie", "query"] }
 # Cookie Max-Age needs time::Duration (cookie 0.18 API); already in the tree
 time = { version = "0.3", default-features = false }
 # OpenAPI (spec §0.1: utoipa 6 + utoipa-axum 0.3 + swagger-ui 10; Swagger dev-only)

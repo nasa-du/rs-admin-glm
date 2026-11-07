@@ -5,7 +5,7 @@
 //! kid/JWKS rotation).
 
 use anyhow::{Context, Result, ensure};
-use jsonwebtoken::EncodingKey;
+use jsonwebtoken::{DecodingKey, EncodingKey};
 use sqlx::PgPool;
 
 /// Application state injected into the router.
@@ -15,12 +15,12 @@ pub struct AppState {
     pub jwt: JwtKeys,
 }
 
-/// HS256 key pair for the access JWT. Only the encoding half exists while
-/// auth is the only implemented module; the users-management milestone adds
-/// the decoding half for the `AuthUser` extractor.
+/// HS256 key pair for the access JWT: `encoding` signs at login / refresh,
+/// `decoding` backs the `AuthUser` extractor on every business endpoint.
 #[derive(Clone)]
 pub struct JwtKeys {
     pub encoding: EncodingKey,
+    pub decoding: DecodingKey,
 }
 
 impl JwtKeys {
@@ -32,6 +32,7 @@ impl JwtKeys {
         );
         Ok(Self {
             encoding: EncodingKey::from_secret(secret),
+            decoding: DecodingKey::from_secret(secret),
         })
     }
 

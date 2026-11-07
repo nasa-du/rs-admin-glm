@@ -12,6 +12,9 @@ import { refreshSession } from '@/lib/auth-refresh'
  */
 export const api = axios.create({
   baseURL: '/api',
+  // The list contract repeats array params (`role=admin&role=user`), not
+  // axios's default `role[]=…` / `role[0]=…` spellings (spec §5.4).
+  paramsSerializer: { indexes: null },
 })
 
 api.interceptors.request.use((config) => {
