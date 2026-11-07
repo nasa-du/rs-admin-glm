@@ -6,7 +6,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Loader2, LogIn } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { type LoginResponse, useAuthStore } from '@/stores/auth-store'
+import { type SessionResponse, useAuthStore } from '@/stores/auth-store'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { api } from '@/lib/axios'
 import { cn } from '@/lib/utils'
@@ -65,7 +65,7 @@ export function UserAuthForm({
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
     try {
-      const { data: session } = await api.post<LoginResponse>('/auth/login', {
+      const { data: session } = await api.post<SessionResponse>('/auth/login', {
         email: data.email,
         password: data.password,
       })

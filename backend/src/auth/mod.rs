@@ -1,11 +1,13 @@
-//! auth module — the login endpoint and its token machinery (spec §4).
+//! auth module — session endpoints and their token machinery (spec §4).
 //!
-//! Issue #15 lands `POST /auth/login`; refresh / logout / password follow in
-//! their own tickets. Login is the tracer bullet: argon2 verification, an
-//! HS256 access JWT (15 min), a fresh token family, and the
-//! `rs_admin_refresh` cookie (ADR 0001).
+//! Login opens a token family; refresh rotates it (reuse detection, family
+//! revocation, fresh user row) and logout revokes the current family
+//! (issue #16). Password change follows in its own ticket. Tokens are an
+//! HS256 access JWT (15 min) plus the opaque `rs_admin_refresh` cookie
+//! (ADR 0001).
 
 pub mod jwt;
+pub mod session;
 pub mod tokens;
 
 use std::sync::LazyLock;
@@ -59,26 +61,26 @@ pub struct UserDto {
     pub updated_at: DateTime<Utc>,
 }
 
-/// `POST /auth/login` success body: `200 {accessToken, user}` + Set-Cookie.
+/// Success body shared by login and refresh: `{accessToken, user}`.
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct LoginResponse {
+pub struct SessionResponse {
     pub access_token: String,
     pub user: UserDto,
 }
 
-/// A `users` row as login reads it.
+/// A `users` row as login and refresh read it.
 #[derive(Debug, FromRow)]
-struct UserRow {
-    id: Uuid,
-    email: String,
-    display_name: String,
-    password_hash: String,
-    role: Role,
-    is_enabled: bool,
-    must_change_password: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+pub(crate) struct UserRow {
+    pub(crate) id: Uuid,
+    pub(crate) email: String,
+    pub(crate) display_name: String,
+    pub(crate) password_hash: String,
+    pub(crate) role: Role,
+    pub(crate) is_enabled: bool,
+    pub(crate) must_change_password: bool,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) updated_at: DateTime<Utc>,
 }
 
 impl From<UserRow> for UserDto {
@@ -116,7 +118,7 @@ static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Signed in; sets the rs_admin_refresh HttpOnly cookie",
-         body = LoginResponse),
+         body = SessionResponse),
         (status = 401, description = "INVALID_CREDENTIALS (unknown email or wrong password) or USER_DISABLED",
          body = crate::error::ErrorBody),
         (status = 422, description = "VALIDATION_ERROR — request body is not parseable",
@@ -150,7 +152,7 @@ pub async fn login(
         .map_err(AppError::Internal)?;
 
     let refresh = tokens::generate_refresh();
-    tokens::insert_family_root(
+    tokens::insert_token(
         &state.pool,
         user.id,
         refresh.family_id,
@@ -158,7 +160,7 @@ pub async fn login(
     )
     .await?;
 
-    let body = LoginResponse {
+    let body = SessionResponse {
         access_token: access,
         user: user.into(),
     };

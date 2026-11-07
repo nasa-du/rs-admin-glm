@@ -56,7 +56,12 @@ pub fn app_router(state: AppState, mount_swagger: bool) -> Router {
     // Endpoint registration happens per module; OpenApiRouter::nest folds the
     // /api prefix into both the routes and the OpenAPI paths (spec §5.1), so
     // the document names real URLs.
-    let auth_routes = OpenApiRouter::<AppState>::new().routes(routes!(auth::login));
+    // One `.routes(...)` per distinct path: utoipa-axum's multi-handler
+    // `routes!` only merges handlers that share a path.
+    let auth_routes = OpenApiRouter::<AppState>::new()
+        .routes(routes!(auth::login))
+        .routes(routes!(auth::session::refresh))
+        .routes(routes!(auth::session::logout));
 
     let (router, openapi) = OpenApiRouter::with_openapi(docs::ApiDoc::openapi())
         .nest("/api", auth_routes)

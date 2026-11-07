@@ -16,7 +16,7 @@ pub struct AppState {
 }
 
 /// HS256 key pair for the access JWT. Only the encoding half exists while
-/// login is the sole auth endpoint; the refresh/hydration ticket (#16) adds
+/// auth is the only implemented module; the users-management milestone adds
 /// the decoding half for the `AuthUser` extractor.
 #[derive(Clone)]
 pub struct JwtKeys {

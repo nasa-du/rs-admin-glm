@@ -8,13 +8,15 @@
 
 use axum::Router;
 use axum::body::Body;
-use axum::http::header::{CONTENT_TYPE, SET_COOKIE};
+use axum::http::header::{CONTENT_TYPE, COOKIE, SET_COOKIE};
 use axum::http::{Request, StatusCode};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
 
 use rs_admin_backend::app_router;
+use rs_admin_backend::auth::tokens::REFRESH_COOKIE_NAME;
 use rs_admin_backend::state::{AppState, JwtKeys};
 
 /// Test signing secret — ≥32 bytes, known to both issuer and tests.
@@ -22,6 +24,11 @@ pub const JWT_SECRET: &[u8] = b"integration-test-secret-32-bytes-xx";
 
 /// The password every seeded user answers to.
 pub const TEST_PASSWORD: &str = "login-test-passw0rd";
+
+/// CSRF second line of defense (spec §4.1): refresh and logout must carry
+/// this exact header or answer 401.
+pub const CSRF_HEADER: &str = "X-Requested-With";
+pub const CSRF_VALUE: &str = "XMLHttpRequest";
 
 /// Pre-computed argon2id PHC hash of [`TEST_PASSWORD`] (spec §7: constants,
 /// not per-test hashing).
@@ -103,6 +110,49 @@ pub fn assert_refresh_cookie(response: &axum::response::Response) -> String {
         assert!(cookie.contains(attribute), "missing {attribute}: {cookie}");
     }
     cookie
+}
+
+/// The refresh plaintext from a login / refresh response's Set-Cookie.
+pub fn refresh_token(response: &axum::response::Response) -> String {
+    let cookie = set_cookie(response);
+    let pair = cookie.split(';').next().unwrap_or_default();
+    pair.strip_prefix(&format!("{REFRESH_COOKIE_NAME}="))
+        .expect("Set-Cookie must name the refresh cookie")
+        .to_owned()
+}
+
+/// A cookie-bearing `POST /api/auth/{refresh|logout}` request. `csrf` is the
+/// `X-Requested-With` value; `None` omits the header (negative cases).
+pub fn auth_request(path: &str, cookie: Option<&str>, csrf: Option<&str>) -> Request<Body> {
+    let mut builder = Request::post(path);
+    if let Some(value) = csrf {
+        builder = builder.header(CSRF_HEADER, value);
+    }
+    if let Some(value) = cookie {
+        builder = builder.header(COOKIE, format!("{REFRESH_COOKIE_NAME}={value}"));
+    }
+    builder.body(Body::empty()).unwrap()
+}
+
+/// A valid `POST /api/auth/refresh` request (CSRF header included).
+pub fn refresh_request(cookie: Option<&str>) -> Request<Body> {
+    auth_request("/api/auth/refresh", cookie, Some(CSRF_VALUE))
+}
+
+/// A valid `POST /api/auth/logout` request (CSRF header included).
+pub fn logout_request(cookie: Option<&str>) -> Request<Body> {
+    auth_request("/api/auth/logout", cookie, Some(CSRF_VALUE))
+}
+
+/// Sign in and return the refresh plaintext.
+pub async fn sign_in(app: &Router, email: &str) -> String {
+    let response = app
+        .clone()
+        .oneshot(login_request(email, TEST_PASSWORD))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK, "sign-in precondition");
+    refresh_token(&response)
 }
 
 /// Assert the §5.2 error contract: status + `{code, title}` shape.

@@ -5,8 +5,8 @@ import { create } from 'zustand'
  *
  * The template's cookie persist middleware and its hardcoded key are gone
  * entirely: the access token lives in memory and dies with the tab. A hard
- * refresh lands back on sign-in until the session-persistence ticket adds
- * refresh-based hydration; that is the expected behavior at this stage.
+ * refresh is hydrated by the `_authenticated` route guard through the
+ * HttpOnly refresh cookie (issue #16), never by reading a token from storage.
  */
 
 /** The backend `User` wire shape (spec §5.1). */
@@ -21,8 +21,8 @@ export interface ApiUser {
   updatedAt: string
 }
 
-/** `POST /auth/login` success body. */
-export interface LoginResponse {
+/** Success body of both `POST /auth/login` and `POST /auth/refresh`. */
+export interface SessionResponse {
   accessToken: string
   user: ApiUser
 }
@@ -40,7 +40,7 @@ interface AuthState {
   user: AuthUser | null
   accessToken: string
   /** Store a successful login / refresh response (wraps the role). */
-  setSession: (payload: LoginResponse) => void
+  setSession: (payload: SessionResponse) => void
   /** Drop the in-memory session (sign-out, expired refresh). */
   reset: () => void
 }

@@ -8,7 +8,6 @@ import {
 } from '@tanstack/react-query'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { useAuthStore } from '@/stores/auth-store'
 import { handleServerError } from '@/lib/handle-server-error'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
@@ -53,15 +52,8 @@ const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error) => {
       if (error instanceof AxiosError) {
-        if (error.response?.status === 401) {
-          // Temporary: the axios single-flight refresh interceptor
-          // (session-persistence ticket, ADR 0003) takes 401 handling over,
-          // and this branch is deleted with it.
-          toast.error(i18n.t('toasts.sessionExpired'))
-          useAuthStore.getState().reset()
-          const redirect = `${router.history.location.href}`
-          router.navigate({ to: '/sign-in', search: { redirect } })
-        }
+        // 401s never reach here: the axios interceptor refreshes and replays
+        // before a failed request surfaces (spec §6.2.3, ADR 0003).
         if (error.response?.status === 500) {
           toast.error(i18n.t('errors.INTERNAL_ERROR'))
           // Only navigate to error page in production to avoid disrupting HMR in development
