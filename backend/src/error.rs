@@ -10,9 +10,11 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use axum::Json;
+use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Field-level codes carried by [`AppError::ValidationError`] — e.g.
 /// `errors: { "email": ["EMAIL_TAKEN"] }`. Stringly-typed on purpose: the
@@ -109,16 +111,16 @@ impl AppError {
     }
 
     /// The wire body for this error (test seam; production path is IntoResponse).
-    fn body(&self) -> ErrorBody<'_> {
+    fn body(&self) -> ErrorBody {
         let (_, code, title) = self.parts();
         ErrorBody {
-            code,
-            title,
+            code: code.to_owned(),
+            title: title.to_owned(),
             errors: match self {
-                Self::ValidationError(errors) => Some(errors),
+                Self::ValidationError(errors) if !errors.is_empty() => Some(errors.clone()),
                 // §5.2: 409 EMAIL_TAKEN carries `errors.email` so the create
                 // form can flag the offending field.
-                Self::EmailTaken => Some(&EMAIL_TAKEN_ERRORS),
+                Self::EmailTaken => Some(EMAIL_TAKEN_ERRORS.clone()),
                 _ => None,
             },
         }
@@ -129,14 +131,15 @@ impl AppError {
 static EMAIL_TAKEN_ERRORS: LazyLock<FieldErrors> =
     LazyLock::new(|| BTreeMap::from([("email".to_string(), vec!["EMAIL_TAKEN".to_string()])]));
 
-/// `{code, title}` + optional `errors` — camelCase per ADR 0003.
-#[derive(Serialize)]
+/// `{code, title}` + optional `errors` — camelCase per ADR 0003. Also the
+/// OpenAPI schema of every error response (spec §5.2).
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-struct ErrorBody<'a> {
-    code: &'a str,
-    title: &'a str,
+pub struct ErrorBody {
+    pub code: String,
+    pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    errors: Option<&'a FieldErrors>,
+    pub errors: Option<FieldErrors>,
 }
 
 impl IntoResponse for AppError {
@@ -152,6 +155,16 @@ impl IntoResponse for AppError {
 impl From<sqlx::Error> for AppError {
     fn from(err: sqlx::Error) -> Self {
         Self::Internal(err.into())
+    }
+}
+
+/// A body that failed JSON extraction (missing, malformed, wrong content
+/// type) is a 422 `VALIDATION_ERROR` like any other — the §5.2 contract has
+/// no room for axum's default rejection bodies. No field map: there is no
+/// field to blame when the body is not even parseable.
+impl From<JsonRejection> for AppError {
+    fn from(_: JsonRejection) -> Self {
+        Self::ValidationError(FieldErrors::new())
     }
 }
 

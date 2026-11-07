@@ -3,6 +3,10 @@ name = "rs-admin-backend"
 version = "0.1.0"
 edition = "2024"
 
+[dev-dependencies]
+# oneshot driving of the assembled router in integration tests (ADR 0004)
+tower = { version = "0.5", features = ["util"] }
+
 [dependencies]
 # Web framework (spec §0.1: axum 0.8.9)
 axum = "0.8.9"
@@ -12,6 +16,8 @@ sqlx = { version = "0.9.0", features = [
   "tls-rustls",
   "postgres",
   "migrate",
+  "chrono",
+  "uuid",
 ] }
 # Runtime
 tokio = { version = "1", features = ["full"] }
@@ -35,3 +41,19 @@ serde_json = "1"
 anyhow = "1"
 # Load backend/.env in development
 dotenvy = "0.15"
+# Access JWT (spec §0.1: HS256, claims sub/email/role, 15 min; ADR 0001)
+jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
+# Refresh-token family ids and user ids (= JWT sub)
+uuid = { version = "1", features = ["v4", "serde"] }
+# RFC 3339 timestamps on the wire (spec §5.1)
+chrono = { version = "0.4", features = ["serde"] }
+# Refresh tokens are stored as SHA-256 hex (spec §2.2)
+sha2 = "0.10"
+# Cookie building (Set-Cookie rs_admin_refresh) + JSON rejection mapping
+axum-extra = { version = "0.10", features = ["cookie"] }
+# Cookie Max-Age needs time::Duration (cookie 0.18 API); already in the tree
+time = { version = "0.3", default-features = false }
+# OpenAPI (spec §0.1: utoipa 6 + utoipa-axum 0.3 + swagger-ui 10; Swagger dev-only)
+utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-axum = "0.3"
+utoipa-swagger-ui = { version = "10.0.2", features = ["axum", "vendored"] }

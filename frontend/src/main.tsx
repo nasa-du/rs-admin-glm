@@ -13,6 +13,8 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
+// i18n must initialize before the tree renders any translated copy
+import i18n from './i18n'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 // Styles
@@ -42,7 +44,7 @@ const queryClient = new QueryClient({
 
         if (error instanceof AxiosError) {
           if (error.response?.status === 304) {
-            toast.error('Content not modified!')
+            toast.error(i18n.t('toasts.contentNotModified'))
           }
         }
       },
@@ -52,13 +54,16 @@ const queryClient = new QueryClient({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
-          toast.error('Session expired!')
-          useAuthStore.getState().auth.reset()
+          // Temporary: the axios single-flight refresh interceptor
+          // (session-persistence ticket, ADR 0003) takes 401 handling over,
+          // and this branch is deleted with it.
+          toast.error(i18n.t('toasts.sessionExpired'))
+          useAuthStore.getState().reset()
           const redirect = `${router.history.location.href}`
           router.navigate({ to: '/sign-in', search: { redirect } })
         }
         if (error.response?.status === 500) {
-          toast.error('Internal Server Error!')
+          toast.error(i18n.t('errors.INTERNAL_ERROR'))
           // Only navigate to error page in production to avoid disrupting HMR in development
           if (import.meta.env.PROD) {
             router.navigate({ to: '/500' })

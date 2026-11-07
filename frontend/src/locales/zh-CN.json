@@ -1,0 +1,53 @@
+{
+  "common": {
+    "appName": "RS Admin",
+    "language": "界面语言"
+  },
+  "languageSwitcher": {
+    "label": "切换界面语言"
+  },
+  "toasts": {
+    "sessionExpired": "会话已过期，请重新登录",
+    "contentNotModified": "内容未修改"
+  },
+  "signIn": {
+    "title": "登录",
+    "description": "输入登录标识（邮箱）与密码登录你的账号",
+    "email": "邮箱",
+    "emailPlaceholder": "name@example.com",
+    "password": "密码",
+    "submit": "登录",
+    "submitting": "登录中…",
+    "welcome": "欢迎回来，{{name}}！",
+    "validation": {
+      "emailRequired": "请输入邮箱",
+      "emailInvalid": "邮箱格式不正确",
+      "passwordRequired": "请输入密码",
+      "passwordMin": "密码至少 8 个字符"
+    }
+  },
+  "signOut": {
+    "title": "登出",
+    "description": "确定要登出吗？再次访问需要重新登录。",
+    "confirm": "登出"
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": "邮箱或密码错误",
+    "USER_DISABLED": "该账号已被禁用，请联系管理员",
+    "EMAIL_TAKEN": "该邮箱已被注册",
+    "VALIDATION_ERROR": "提交的内容有误，请检查后重试",
+    "FORBIDDEN": "没有权限执行此操作",
+    "SELF_MANAGEMENT_FORBIDDEN": "不能对自己的账号执行此操作",
+    "LAST_SUPERADMIN": "系统必须保留至少一名启用的超级管理员",
+    "REFRESH_INVALID": "会话已过期，请重新登录",
+    "NOT_FOUND": "请求的资源不存在",
+    "INTERNAL_ERROR": "服务器开小差了，请稍后重试",
+    "NETWORK_ERROR": "网络异常，请检查连接后重试",
+    "EMAIL_INVALID": "邮箱格式不正确",
+    "PASSWORD_TOO_SHORT": "密码至少 8 个字符",
+    "PASSWORD_TOO_LONG": "密码不能超过 128 个字符",
+    "CURRENT_PASSWORD_INCORRECT": "当前密码不正确",
+    "DISPLAY_NAME_REQUIRED": "请输入显示名",
+    "DISPLAY_NAME_TOO_LONG": "显示名不能超过 32 个字符"
+  }
+}

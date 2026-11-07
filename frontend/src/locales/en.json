@@ -1,0 +1,53 @@
+{
+  "common": {
+    "appName": "RS Admin",
+    "language": "Language"
+  },
+  "languageSwitcher": {
+    "label": "Switch language"
+  },
+  "toasts": {
+    "sessionExpired": "Your session has expired, please sign in again",
+    "contentNotModified": "Content not modified"
+  },
+  "signIn": {
+    "title": "Sign in",
+    "description": "Enter your email and password below to log into your account",
+    "email": "Email",
+    "emailPlaceholder": "name@example.com",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "welcome": "Welcome back, {{name}}!",
+    "validation": {
+      "emailRequired": "Please enter your email",
+      "emailInvalid": "Please enter a valid email address",
+      "passwordRequired": "Please enter your password",
+      "passwordMin": "Password must be at least 8 characters long"
+    }
+  },
+  "signOut": {
+    "title": "Sign out",
+    "description": "Are you sure you want to sign out? You will need to sign in again to access your account.",
+    "confirm": "Sign out"
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": "Email or password is incorrect",
+    "USER_DISABLED": "This account has been disabled. Please contact an administrator.",
+    "EMAIL_TAKEN": "This email is already registered",
+    "VALIDATION_ERROR": "Please check the form and try again",
+    "FORBIDDEN": "You do not have permission to perform this action",
+    "SELF_MANAGEMENT_FORBIDDEN": "You cannot apply this action to your own account",
+    "LAST_SUPERADMIN": "The system must keep at least one enabled superadmin",
+    "REFRESH_INVALID": "Your session has expired, please sign in again",
+    "NOT_FOUND": "Not found",
+    "INTERNAL_ERROR": "Something went wrong on our side. Please try again later.",
+    "NETWORK_ERROR": "Network error. Please check your connection and try again.",
+    "EMAIL_INVALID": "Please enter a valid email address",
+    "PASSWORD_TOO_SHORT": "Password must be at least 8 characters long",
+    "PASSWORD_TOO_LONG": "Password must not exceed 128 characters",
+    "CURRENT_PASSWORD_INCORRECT": "Current password is incorrect",
+    "DISPLAY_NAME_REQUIRED": "Please enter a display name",
+    "DISPLAY_NAME_TOO_LONG": "Display name must not exceed 32 characters"
+  }
+}
