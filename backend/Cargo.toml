@@ -24,6 +24,13 @@ tower-http = { version = "0.7.1", features = [
 # Observability
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# Password hashing (spec §0.1: argon2 0.6, `Argon2::default()` = OWASP baseline)
+argon2 = "0.6.0"
+# OS entropy for initial-password generation (already in the tree via password-hash)
+getrandom = "0.4"
+# Error-body / future JSON serialization (camelCase contract, ADR 0003)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 # Bootstrap ergonomics (module errors get a typed AppError from M1, see docs/spec.md §1)
 anyhow = "1"
 # Load backend/.env in development

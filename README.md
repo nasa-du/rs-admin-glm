@@ -1,8 +1,9 @@
 # rs-admin-glm
 
 rs-admin 管理后台 monorepo：`frontend/`（shadcn-admin v2.2.1 fork 裁剪，TanStack Router + shadcn/ui）
-+ `backend/`（Rust Axum 单 crate，sqlx + PostgreSQL 18）。当前处于 M0 基座阶段（[#13]）：
-全链路可跑、无业务行为——登录为前端 mock，后端为空 router。
++ `backend/`（Rust Axum 单 crate，sqlx + PostgreSQL 18）。当前处于 M1 数据层阶段（[#14]）：
+users / refresh_tokens 迁移落库、`seed-superadmin` CLI 冷启动首个超管、AppError 十码错误骨架；
+API 仍未上线——登录为前端 mock，后端 router 无业务端点（auth M2 / users M3 接入）。
 
 完整蓝图见 [docs/spec.md](docs/spec.md)，词汇表见 [CONTEXT.md](CONTEXT.md)，决策记录见 [docs/adr/](docs/adr/)。
 
@@ -14,12 +15,15 @@ rs-admin 管理后台 monorepo：`frontend/`（shadcn-admin v2.2.1 fork 裁剪�
 # 1. 数据库（postgres:18-alpine，仅此一个服务）
 docker compose up -d db
 
-# 2. 后端（127.0.0.1:3000；启动即跑迁移，当前为空集）
+# 2. 后端（127.0.0.1:3000；启动即跑迁移，幂等）
 cd backend
 cp .env.example .env
 cargo run
 
-# 3. 前端（http://localhost:5173，/api 一条规则代理到 127.0.0.1:3000）
+# 3. 冷启动首位超级管理员（spec §2.3；密码随机生成、仅打印一次）
+cargo run -- seed-superadmin --email <email>   # [--password <password>] 可选
+
+# 4. 前端（http://localhost:5173，/api 一条规则代理到 127.0.0.1:3000）
 cd ../frontend
 npm install
 npm run dev
@@ -32,15 +36,16 @@ npm run dev
 
 | 范围 | 命令 |
 |---|---|
-| 后端 | `cd backend && cargo build`（fmt / clippy / test 随 M1 测试基线加入） |
+| 后端 | `cd backend && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`（测试需 `docker compose up -d db`，每测试一座临时库） |
 | 前端 | `cd frontend && npm run lint && npm run build`（= eslint + tsc -b + vite build） |
 
 ## 目录
 
 ```
 frontend/   # shadcn-admin v2.2.1 fork：dashboard / users / sign-in / settings + 403/500
-backend/    # Axum 骨架：tracing + PgPool + 启动迁移 + 空 router
+backend/    # Axum：tracing + PgPool + 启动迁移；migrations（users/refresh_tokens）+ seed CLI + AppError 骨架
 docs/       # spec、ADR
 ```
 
 [#13]: https://github.com/nasa-du/rs-admin-glm/issues/13
+[#14]: https://github.com/nasa-du/rs-admin-glm/issues/14
