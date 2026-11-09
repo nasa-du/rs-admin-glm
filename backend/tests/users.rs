@@ -1,20 +1,22 @@
-//! Users list / create contract tests (issue #17, spec §3 / §5.3 / §5.4).
+//! Users list / create / lifecycle contract tests (issues #17–#18, spec §3 /
+//! §5.3 / §5.4).
 //!
-//! The RBAC matrix, manage-down rule, list query contract, and one-time
-//! initial password are asserted at the assembled HTTP boundary (ADR 0004):
-//! a request goes in, a status + JSON body come out.
+//! The RBAC matrix, manage-down rule, list query contract, one-time initial
+//! password, and the update / delete / password-reset endpoints are asserted
+//! at the assembled HTTP boundary (ADR 0004): a request goes in, a status +
+//! JSON body come out.
 
 mod common;
 
-use axum::http::StatusCode;
+use axum::http::{Method, StatusCode};
 use chrono::DateTime;
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use common::{
-    assert_error_contract, body_json, get_with_token, logout_request, post_json_with_token,
-    refresh_request, refresh_token, seed_user, sign_in_session, test_app,
+    assert_error_contract, body_json, get_with_token, logout_request, manage_request,
+    post_json_with_token, refresh_request, refresh_token, seed_user, sign_in_session, test_app,
 };
 
 fn create_body(email: &str, display_name: &str, role: &str) -> serde_json::Value {
@@ -764,6 +766,434 @@ async fn superadmin_can_create_an_admin_who_can_then_sign_in(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn role_matrix_governs_the_manage_endpoints(pool: PgPool) {
+    let app = test_app(pool.clone());
+    // One target per tier; root (the acting superadmin) keeps a second
+    // enabled superadmin alive, so no cell trips the last-superadmin 409 —
+    // manage-down alone decides these cells (guardrails: guardrails.rs).
+    let target = [
+        seed_user(&pool, "t-user@example.com", "user", true).await,
+        seed_user(&pool, "t-admin@example.com", "admin", true).await,
+        seed_user(&pool, "t-super@example.com", "superadmin", true).await,
+    ];
+    let tokens = three_tier_tokens(&app, &pool).await;
+
+    // (actor, [patch user/admin/super, reset user/admin/super,
+    //          delete user/admin/super])
+    // Delete is superadmin-only; everything else is manage-down.
+    let matrix = [
+        ("user", [403, 403, 403, 403, 403, 403, 403, 403, 403]),
+        ("admin", [200, 403, 403, 200, 403, 403, 403, 403, 403]),
+        ("superadmin", [200, 200, 403, 200, 200, 403, 204, 204, 403]),
+    ];
+
+    for (role, expected) in matrix {
+        let (_, token) = tokens
+            .iter()
+            .find(|(name, _)| name == role)
+            .expect("token for every role");
+
+        let ops = [
+            (
+                Method::PATCH,
+                "displayName edit",
+                Some(serde_json::json!({
+                    "displayName": "Matrix Edit"
+                })),
+            ),
+            (Method::POST, "password reset", None),
+            (Method::DELETE, "hard delete", None),
+        ];
+        let mut cell = 0;
+        for (method, what, body) in ops {
+            for (tier, id) in target.iter().enumerate() {
+                let path = match method {
+                    Method::POST => format!("/api/users/{id}/password-reset"),
+                    _ => format!("/api/users/{id}"),
+                };
+                let response =
+                    manage_request(&app, method.clone(), &path, token, body.clone()).await;
+                let tier_name = ["user", "admin", "superadmin"][tier];
+                assert_eq!(
+                    response.status().as_u16(),
+                    expected[cell],
+                    "{what} on {tier_name} as {role}"
+                );
+                cell += 1;
+            }
+        }
+    }
+
+    // Only the superadmin's two deletes landed; the six seeded accounts and
+    // the surviving peer superadmin remain.
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(total, 4, "three tiers + three targets minus two deletes");
+}
+
+#[sqlx::test]
+async fn update_applies_each_field_under_its_rules(pool: PgPool) {
+    let app = test_app(pool.clone());
+    seed_user(&pool, "root@example.com", "superadmin", true).await;
+    seed_user(&pool, "manager@example.com", "admin", true).await;
+    let target = seed_user(&pool, "t-user@example.com", "user", true).await;
+    let peer_admin = seed_user(&pool, "t-admin@example.com", "admin", true).await;
+    let (root_token, _) = sign_in_session(&app, "root@example.com").await;
+    let (manager_token, _) = sign_in_session(&app, "manager@example.com").await;
+    let path = format!("/api/users/{target}");
+
+    // An admin may edit a strictly-lower user's display name (trimmed, and
+    // the response carries the full updated row).
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &path,
+        &manager_token,
+        Some(serde_json::json!({ "displayName": "  Renamed  " })),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["user"]["displayName"], "Renamed");
+    assert_eq!(body["user"]["email"], "t-user@example.com");
+    assert_eq!(body["user"]["role"], "user");
+    assert_eq!(body["user"]["isEnabled"], true);
+
+    // Role assignment is superadmin-exclusive — even a no-op value.
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &path,
+        &manager_token,
+        Some(serde_json::json!({ "role": "user" })),
+    )
+    .await;
+    assert_error_contract(response, StatusCode::FORBIDDEN, "FORBIDDEN").await;
+
+    // A superadmin changes roles strictly below their own rank.
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &path,
+        &root_token,
+        Some(serde_json::json!({ "role": "admin" })),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(body_json(response).await["user"]["role"], "admin");
+
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &path,
+        &root_token,
+        Some(serde_json::json!({ "role": "superadmin" })),
+    )
+    .await;
+    assert_error_contract(response, StatusCode::FORBIDDEN, "FORBIDDEN").await;
+
+    // Manage-down: a peer admin is visible but untouchable.
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &format!("/api/users/{peer_admin}"),
+        &manager_token,
+        Some(serde_json::json!({ "displayName": "Nope" })),
+    )
+    .await;
+    assert_error_contract(response, StatusCode::FORBIDDEN, "FORBIDDEN").await;
+
+    // Field validation mirrors create.
+    for (case, body, field, code) in [
+        (
+            "blank display name",
+            serde_json::json!({ "displayName": "   " }),
+            "displayName",
+            "DISPLAY_NAME_REQUIRED",
+        ),
+        (
+            "long display name",
+            serde_json::json!({ "displayName": "x".repeat(33) }),
+            "displayName",
+            "DISPLAY_NAME_TOO_LONG",
+        ),
+        (
+            "unknown role",
+            serde_json::json!({ "role": "root" }),
+            "role",
+            "ROLE_INVALID",
+        ),
+    ] {
+        let response = manage_request(&app, Method::PATCH, &path, &root_token, Some(body)).await;
+        let body = assert_error_contract(
+            response,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "VALIDATION_ERROR",
+        )
+        .await;
+        assert_eq!(body["errors"][field][0], code, "case: {case}");
+    }
+
+    // The PATCH vocabulary is closed: unknown fields are ignored, the login
+    // identifier is not editable here.
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &path,
+        &root_token,
+        Some(serde_json::json!({
+            "email": "hijack@example.com",
+            "displayName": "Kept",
+        })),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["user"]["displayName"], "Kept");
+    assert_eq!(body["user"]["email"], "t-user@example.com");
+}
+
+#[sqlx::test]
+async fn manage_endpoints_answer_404_for_unknown_targets(pool: PgPool) {
+    let app = test_app(pool.clone());
+    seed_user(&pool, "root@example.com", "superadmin", true).await;
+    let (token, _) = sign_in_session(&app, "root@example.com").await;
+    let unknown = Uuid::new_v4();
+
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &format!("/api/users/{unknown}"),
+        &token,
+        Some(serde_json::json!({ "displayName": "Ghost" })),
+    )
+    .await;
+    assert_error_contract(response, StatusCode::NOT_FOUND, "NOT_FOUND").await;
+
+    let response = manage_request(
+        &app,
+        Method::DELETE,
+        &format!("/api/users/{unknown}"),
+        &token,
+        None,
+    )
+    .await;
+    assert_error_contract(response, StatusCode::NOT_FOUND, "NOT_FOUND").await;
+
+    let response = manage_request(
+        &app,
+        Method::POST,
+        &format!("/api/users/{unknown}/password-reset"),
+        &token,
+        None,
+    )
+    .await;
+    assert_error_contract(response, StatusCode::NOT_FOUND, "NOT_FOUND").await;
+}
+
+#[sqlx::test]
+async fn role_change_reaches_the_access_token_at_the_next_refresh(pool: PgPool) {
+    let app = test_app(pool.clone());
+    seed_user(&pool, "root@example.com", "superadmin", true).await;
+    let target = seed_user(&pool, "t-user@example.com", "user", true).await;
+    let (root_token, _) = sign_in_session(&app, "root@example.com").await;
+    let (old_access, refresh) = sign_in_session(&app, "t-user@example.com").await;
+
+    let response = manage_request(
+        &app,
+        Method::PATCH,
+        &format!("/api/users/{target}"),
+        &root_token,
+        Some(serde_json::json!({ "role": "admin" })),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // The unexpired access token keeps its original claim — there is no
+    // per-request users lookup (spec §3)…
+    let response = app
+        .clone()
+        .oneshot(get_with_token("/api/users", &old_access))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN, "old user claim");
+
+    // …the next rotation re-reads the row and signs the new role, without
+    // having revoked the session (spec §4.2).
+    let response = app
+        .clone()
+        .oneshot(refresh_request(Some(&refresh)))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "role change keeps sessions"
+    );
+    let body = body_json(response).await;
+    assert_eq!(body["user"]["role"], "admin");
+    let claims = common::decode_access(body["accessToken"].as_str().unwrap());
+    assert_eq!(
+        claims["role"], "admin",
+        "the new access token carries the new role"
+    );
+}
+
+#[sqlx::test]
+async fn superadmin_hard_deletes_a_user_and_their_sessions(pool: PgPool) {
+    let app = test_app(pool.clone());
+    seed_user(&pool, "root@example.com", "superadmin", true).await;
+    let target = seed_user(&pool, "t-user@example.com", "user", true).await;
+    let (root_token, _) = sign_in_session(&app, "root@example.com").await;
+    let (_, refresh) = sign_in_session(&app, "t-user@example.com").await;
+
+    let response = manage_request(
+        &app,
+        Method::DELETE,
+        &format!("/api/users/{target}"),
+        &root_token,
+        None,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    // Hard delete: the login identifier is gone (anti-enumeration keeps the
+    // same 401 as a wrong password)…
+    let response = app
+        .clone()
+        .oneshot(common::login_request(
+            "t-user@example.com",
+            common::TEST_PASSWORD,
+        ))
+        .await
+        .unwrap();
+    assert_error_contract(response, StatusCode::UNAUTHORIZED, "INVALID_CREDENTIALS").await;
+
+    // …and every session died with the row (families cascade, spec §2.2).
+    let response = app
+        .clone()
+        .oneshot(refresh_request(Some(&refresh)))
+        .await
+        .unwrap();
+    assert_error_contract(response, StatusCode::UNAUTHORIZED, "REFRESH_INVALID").await;
+
+    let remaining: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(remaining, 1, "no tombstone row survives a hard delete");
+}
+
+#[sqlx::test]
+async fn password_reset_reissues_a_one_time_password_and_ends_all_sessions(pool: PgPool) {
+    let app = test_app(pool.clone());
+    seed_user(&pool, "manager@example.com", "admin", true).await;
+    let target = seed_user(&pool, "t-user@example.com", "user", true).await;
+    let frozen = seed_user(&pool, "frozen@example.com", "user", false).await;
+    let (manager_token, _) = sign_in_session(&app, "manager@example.com").await;
+
+    // Two browsers hold live sessions before the reset.
+    let first = common::sign_in(&app, "t-user@example.com").await;
+    let second = common::sign_in(&app, "t-user@example.com").await;
+
+    let response = manage_request(
+        &app,
+        Method::POST,
+        &format!("/api/users/{target}/password-reset"),
+        &manager_token,
+        None,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(
+        body.as_object().expect("object body").len(),
+        1,
+        "the body is exactly {{initialPassword}}"
+    );
+    let initial_password = body["initialPassword"].as_str().expect("initialPassword");
+    assert_eq!(initial_password.chars().count(), 16, "spec §2.4");
+
+    // The stored form is an argon2 hash of the one-time password.
+    let hash: String = sqlx::query_scalar("SELECT password_hash FROM users WHERE id = $1")
+        .bind(target)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_ne!(hash, initial_password, "plaintext must never be stored");
+    assert!(rs_admin_backend::password::verify_password(initial_password, &hash).unwrap());
+
+    // must_change_password is re-armed; isEnabled is untouched (重置 ≠ 解禁).
+    let response = app
+        .clone()
+        .oneshot(get_with_token("/api/users?q=t-user", &manager_token))
+        .await
+        .unwrap();
+    let body = body_json(response).await;
+    assert_eq!(body["data"][0]["mustChangePassword"], true);
+    assert_eq!(body["data"][0]["isEnabled"], true);
+
+    // All of the target's sessions are dead.
+    for token in [&first, &second] {
+        let response = app
+            .clone()
+            .oneshot(refresh_request(Some(token)))
+            .await
+            .unwrap();
+        assert_error_contract(response, StatusCode::UNAUTHORIZED, "REFRESH_INVALID").await;
+    }
+
+    // The old password no longer verifies; the initial password signs in and
+    // forces its own replacement.
+    let response = app
+        .clone()
+        .oneshot(common::login_request(
+            "t-user@example.com",
+            common::TEST_PASSWORD,
+        ))
+        .await
+        .unwrap();
+    assert_error_contract(response, StatusCode::UNAUTHORIZED, "INVALID_CREDENTIALS").await;
+    let response = app
+        .clone()
+        .oneshot(common::login_request(
+            "t-user@example.com",
+            initial_password,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        body_json(response).await["user"]["mustChangePassword"],
+        true
+    );
+
+    // Resetting a disabled user works and keeps them disabled.
+    let response = manage_request(
+        &app,
+        Method::POST,
+        &format!("/api/users/{frozen}/password-reset"),
+        &manager_token,
+        None,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let response = app
+        .clone()
+        .oneshot(get_with_token("/api/users?q=frozen", &manager_token))
+        .await
+        .unwrap();
+    let body = body_json(response).await;
+    assert_eq!(
+        body["data"][0]["isEnabled"], false,
+        "reset does not un-disable"
+    );
+    assert_eq!(body["data"][0]["mustChangePassword"], true);
+}
+
+#[sqlx::test]
 async fn dev_swagger_documents_the_users_endpoints(pool: PgPool) {
     let response = test_app(pool)
         .oneshot(
@@ -783,4 +1213,16 @@ async fn dev_swagger_documents_the_users_endpoints(pool: PgPool) {
             doc["paths"]
         );
     }
+    for method in ["patch", "delete"] {
+        assert!(
+            doc["paths"]["/api/users/{id}"][method].is_object(),
+            "openapi.json must document {method} /api/users/{{id}}: {}",
+            doc["paths"]
+        );
+    }
+    assert!(
+        doc["paths"]["/api/users/{id}/password-reset"]["post"].is_object(),
+        "openapi.json must document post /api/users/{{id}}/password-reset: {}",
+        doc["paths"]
+    );
 }

@@ -75,7 +75,16 @@
       "role": "Role",
       "status": "Status",
       "createdAt": "Created",
-      "updatedAt": "Updated"
+      "updatedAt": "Updated",
+      "actions": "Actions"
+    },
+    "actions": {
+      "open": "Actions for {{displayName}}",
+      "edit": "Edit",
+      "disable": "Disable",
+      "enable": "Enable",
+      "resetPassword": "Reset password",
+      "delete": "Delete"
     },
     "createDialog": {
       "title": "Add User",
@@ -88,12 +97,48 @@
       "creating": "Creating…",
       "credentialsTitle": "User created",
       "createdFor": "Account {{email}} created.",
-      "initialPassword": "Initial password",
+      "done": "Done"
+    },
+    "initialPassword": {
+      "label": "Initial password",
       "copy": "Copy password",
       "copied": "Password copied",
       "copyFailed": "Could not copy the password",
-      "shownOnce": "Shown only once. The user must change it at first sign-in; it cannot be recovered.",
-      "done": "Done"
+      "shownOnce": "Shown only once. The user must change it at first sign-in; it cannot be recovered."
+    },
+    "editDialog": {
+      "title": "Edit user",
+      "description": "Change the display name and role of {{email}}.",
+      "roleHint": "You can only assign roles below your own.",
+      "submit": "Save changes",
+      "saving": "Saving…"
+    },
+    "disableDialog": {
+      "title": "Disable user",
+      "description": "All sessions of {{email}} end within 15 minutes at the latest and they cannot sign in; you can re-enable the account at any time.",
+      "confirm": "Disable",
+      "enableTitle": "Enable user",
+      "enableDescription": "Re-enable {{email}} so they can sign in again.",
+      "enableConfirm": "Enable"
+    },
+    "deleteDialog": {
+      "title": "Delete user",
+      "description": "Permanently delete {{email}} ({{displayName}}) and all of their sessions. This cannot be undone.",
+      "confirm": "Delete permanently"
+    },
+    "resetDialog": {
+      "title": "Reset password",
+      "description": "Issue a new initial password for {{email}}; all of their sessions end immediately. The enabled flag is not changed.",
+      "confirm": "Reset password",
+      "resetting": "Resetting…",
+      "credentialsTitle": "Password reset",
+      "resetFor": "The new initial password for {{email}}:"
+    },
+    "toasts": {
+      "updated": "Saved changes to {{email}}",
+      "disabled": "Disabled {{email}}",
+      "enabled": "Enabled {{email}}",
+      "deleted": "Deleted {{email}}"
     },
     "validation": {
       "emailRequired": "Please enter an email",

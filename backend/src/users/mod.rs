@@ -1,15 +1,18 @@
-//! users module — list and create (issue #17, spec §3 / §5.3 / §5.4).
+//! users module — list, create, and the lifecycle closure of update / delete
+//! / password-reset (issues #17–#18, spec §3 / §5.3 / §5.4).
 //!
 //! `GET /users` is the admin+ server-side list: pagination, sort whitelist,
 //! role / status filters, and fuzzy search over login identifier and display
 //! name. `POST /users` is manage-down creation: the new role must be
-//! strictly below the caller's, so no API call can mint a superadmin.
+//! strictly below the caller's, so no API call can mint a superadmin. The
+//! `manage` submodule closes the lifecycle with the two spec §3 guardrails.
 //!
 //! Authorization reads the role from the JWT claim via [`AuthUser`]; there
 //! is no per-request users lookup (spec §3). The created initial password is
 //! generated here, returned once in the 201 body, and stored only as its
 //! argon2 PHC hash.
 
+pub mod manage;
 pub mod query;
 
 use axum::Json;
@@ -232,7 +235,7 @@ pub async fn create(
     }
 }
 
-fn field_error(field: &str, code: &str) -> AppError {
+pub(crate) fn field_error(field: &str, code: &str) -> AppError {
     AppError::ValidationError(FieldErrors::from([(
         field.to_owned(),
         vec![code.to_owned()],

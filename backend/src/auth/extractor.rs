@@ -97,3 +97,23 @@ impl FromRequestParts<AppState> for AdminUser {
         Ok(Self(user))
     }
 }
+
+/// Superadmin-only route gate (spec §3: deletion is superadmin-exclusive).
+/// Role assignment is enforced field-conditionally inside the update handler
+/// instead (a PATCH without `role` must not need the gate). Same ordering
+/// property as [`AdminUser`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuperadminUser(pub AuthUser);
+
+impl FromRequestParts<AppState> for SuperadminUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthUser::from_request_parts(parts, state).await?;
+        user.require_at_least(Role::Superadmin)?;
+        Ok(Self(user))
+    }
+}

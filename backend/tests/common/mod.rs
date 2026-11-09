@@ -197,6 +197,22 @@ pub fn post_json_with_token(path: &str, access: &str, body: serde_json::Value) -
     authenticated_request(Method::POST, path, access, Some(body))
 }
 
+/// Send a Bearer-authenticated management request (any method, optional JSON
+/// body) through the assembled router — the shape the lifecycle tests drive
+/// `PATCH` / `DELETE` / password-reset with.
+pub async fn manage_request(
+    app: &Router,
+    method: Method,
+    path: &str,
+    access: &str,
+    body: Option<serde_json::Value>,
+) -> axum::response::Response {
+    app.clone()
+        .oneshot(authenticated_request(method, path, access, body))
+        .await
+        .expect("manage request reaches the router")
+}
+
 /// Assert the §5.2 error contract: status + `{code, title}` shape.
 pub async fn assert_error_contract(
     response: axum::response::Response,

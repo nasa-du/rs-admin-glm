@@ -64,7 +64,12 @@ pub fn app_router(state: AppState, mount_swagger: bool) -> Router {
         .routes(routes!(auth::session::refresh))
         .routes(routes!(auth::session::logout));
 
-    let users_routes = OpenApiRouter::<AppState>::new().routes(routes!(users::list, users::create));
+    let users_routes = OpenApiRouter::<AppState>::new()
+        .routes(routes!(users::list, users::create))
+        // update and delete share the /users/{id} path; password-reset is
+        // its own path.
+        .routes(routes!(users::manage::update, users::manage::delete))
+        .routes(routes!(users::manage::reset_password));
 
     let (router, openapi) = OpenApiRouter::with_openapi(docs::ApiDoc::openapi())
         .nest("/api", auth_routes)

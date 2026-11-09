@@ -1,20 +1,27 @@
 import React from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
+import { type User } from '../data/schema'
 
-type UsersDialogType = 'create'
+type UsersDialogType = 'create' | 'edit' | 'disable' | 'delete' | 'reset'
 
 type UsersContextType = {
   open: UsersDialogType | null
   setOpen: (str: UsersDialogType | null) => void
+  /** The row the management dialog targets; `null` for create. */
+  currentRow: User | null
+  setCurrentRow: (row: User | null) => void
 }
 
 const UsersContext = React.createContext<UsersContextType | null>(null)
 
 export function UsersProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useDialogState<UsersDialogType>(null)
+  const [currentRow, setCurrentRow] = React.useState<User | null>(null)
 
   return (
-    <UsersContext value={{ open, setOpen }}>{children}</UsersContext>
+    <UsersContext value={{ open, setOpen, currentRow, setCurrentRow }}>
+      {children}
+    </UsersContext>
   )
 }
 

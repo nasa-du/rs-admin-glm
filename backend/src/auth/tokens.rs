@@ -212,6 +212,35 @@ pub(crate) async fn revoke_family(
     Ok(())
 }
 
+/// Revoke every family of one user (spec §4.2: password reset and disable
+/// revoke explicitly; deletion cascades via the FK instead). All sessions of
+/// the user end — other users' families are untouched.
+///
+/// Locks each family before deleting, ordered by `family_id` so two
+/// concurrent multi-family revocations cannot deadlock, and so a rotation
+/// already in flight is either deleted with its family or starts after us
+/// and finds no row (see [`lock_family`]).
+pub(crate) async fn revoke_user_families(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    let family_ids: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT DISTINCT family_id FROM refresh_tokens \
+         WHERE user_id = $1 ORDER BY family_id",
+    )
+    .bind(user_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    for family_id in family_ids {
+        lock_family(tx, family_id).await?;
+    }
+    sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
 /// Lowercase hex encoding.
 fn hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";

@@ -8,6 +8,7 @@ import { DataTableColumnHeader } from '@/components/data-table'
 import { LongText } from '@/components/long-text'
 import { roleOptions, statusBadgeClasses } from '../data/data'
 import { type User } from '../data/schema'
+import { UsersRowActions } from './users-row-actions'
 
 /**
  * The users table columns. Labels and dates follow the current UI language
@@ -134,6 +135,23 @@ export function useUsersColumns(): ColumnDef<User>[] {
           </div>
         ),
         meta: { title: t('users.columns.updatedAt') },
+      },
+      {
+        id: 'actions',
+        header: () => (
+          <div className='flex justify-end pe-2'>
+            {t('users.columns.actions')}
+          </div>
+        ),
+        cell: ({ row }) => (
+          <div className='flex justify-end'>
+            <UsersRowActions user={row.original} />
+          </div>
+        ),
+        meta: { title: t('users.columns.actions') },
+        // The action menu is the point of this column.
+        enableHiding: false,
+        enableSorting: false,
       },
     ]
   }, [t, i18n.language])

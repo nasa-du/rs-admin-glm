@@ -75,7 +75,16 @@
       "role": "角色",
       "status": "状态",
       "createdAt": "创建时间",
-      "updatedAt": "更新时间"
+      "updatedAt": "更新时间",
+      "actions": "操作"
+    },
+    "actions": {
+      "open": "操作（{{displayName}}）",
+      "edit": "编辑",
+      "disable": "禁用",
+      "enable": "启用",
+      "resetPassword": "重置密码",
+      "delete": "删除"
     },
     "createDialog": {
       "title": "新增用户",
@@ -88,12 +97,48 @@
       "creating": "创建中…",
       "credentialsTitle": "用户已创建",
       "createdFor": "账号 {{email}} 已创建。",
-      "initialPassword": "初始密码",
+      "done": "完成"
+    },
+    "initialPassword": {
+      "label": "初始密码",
       "copy": "复制密码",
       "copied": "密码已复制",
       "copyFailed": "无法复制密码，请手动选择",
-      "shownOnce": "只显示这一次。该用户首次登录时必须修改密码，此密码无法找回。",
-      "done": "完成"
+      "shownOnce": "只显示这一次。该用户首次登录时必须修改密码，此密码无法找回。"
+    },
+    "editDialog": {
+      "title": "编辑用户",
+      "description": "修改 {{email}} 的显示名与角色。",
+      "roleHint": "只能分配低于自己档位的角色。",
+      "submit": "保存修改",
+      "saving": "保存中…"
+    },
+    "disableDialog": {
+      "title": "禁用用户",
+      "description": "禁用后 {{email}} 的全部会话将在至多 15 分钟内失效，且无法再登录；可随时重新启用。",
+      "confirm": "禁用",
+      "enableTitle": "启用用户",
+      "enableDescription": "重新启用 {{email}}，允许其再次登录。",
+      "enableConfirm": "启用"
+    },
+    "deleteDialog": {
+      "title": "删除用户",
+      "description": "将永久删除 {{email}}（{{displayName}}）及其全部会话，此操作不可撤销。",
+      "confirm": "永久删除"
+    },
+    "resetDialog": {
+      "title": "重置密码",
+      "description": "为 {{email}} 生成新的初始密码，其全部会话将立即终止；不影响账号的启用状态。",
+      "confirm": "重置密码",
+      "resetting": "重置中…",
+      "credentialsTitle": "密码已重置",
+      "resetFor": "{{email}} 的新初始密码如下。"
+    },
+    "toasts": {
+      "updated": "已保存 {{email}} 的修改",
+      "disabled": "已禁用 {{email}}",
+      "enabled": "已启用 {{email}}",
+      "deleted": "已删除 {{email}}"
     },
     "validation": {
       "emailRequired": "请输入邮箱",
