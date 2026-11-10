@@ -52,7 +52,8 @@ pub struct UpdateUserRequest {
     pub is_enabled: Option<bool>,
 }
 
-/// `200` body of `PATCH /users/:id` (spec §5.3).
+/// `200` body of `PATCH /users/:id` (spec §5.3) — also the `PATCH /users/me`
+/// body: the same `{user}` envelope.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UpdateUserResponse {
     pub user: UserDto,
@@ -138,12 +139,10 @@ fn ensure_manage_down(auth: &AuthUser, target_role: Role) -> Result<(), AppError
     }
 }
 
-/// Validate an optional display name: trim, then 1–32 characters by count
-/// (spec §2.1). `None` passes through — absent means "keep".
-fn validated_display_name(raw: &Option<String>) -> Result<Option<String>, AppError> {
-    let Some(raw) = raw else {
-        return Ok(None);
-    };
+/// Validate a display name: trim, then 1–32 characters by count (spec §2.1).
+/// Shared with `PATCH /users/me`; the manage endpoint wraps it for the
+/// optional-field "absent means keep" semantics.
+pub(crate) fn validated_display_name(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
     let len = trimmed.chars().count();
     if len == 0 {
@@ -151,7 +150,7 @@ fn validated_display_name(raw: &Option<String>) -> Result<Option<String>, AppErr
     } else if len > 32 {
         Err(field_error("displayName", "DISPLAY_NAME_TOO_LONG"))
     } else {
-        Ok(Some(trimmed.to_owned()))
+        Ok(trimmed.to_owned())
     }
 }
 
@@ -208,7 +207,11 @@ pub async fn update(
             return Err(AppError::Forbidden);
         }
     }
-    let display_name = validated_display_name(&body.display_name)?;
+    // Absent means keep; present means validated.
+    let display_name = match &body.display_name {
+        Some(raw) => Some(validated_display_name(raw)?),
+        None => None,
+    };
 
     // Disabling ends every session of the target now (spec §4.2); enabling
     // and role changes do not — the next refresh re-reads the row instead.
@@ -333,19 +336,13 @@ mod tests {
     #[test]
     fn display_name_validation_mirrors_create() {
         assert_eq!(
-            validated_display_name(&None).unwrap(),
-            None,
-            "absent keeps the current value"
+            validated_display_name("  Name  ").unwrap(),
+            "Name".to_owned(),
+            "values are trimmed"
         );
         assert_eq!(
-            validated_display_name(&Some("  Name  ".to_owned())).unwrap(),
-            Some("Name".to_owned()),
-            "present values are trimmed"
-        );
-        assert_eq!(
-            validated_display_name(&Some("é".repeat(32)))
+            validated_display_name(&"é".repeat(32))
                 .unwrap()
-                .expect("valid name")
                 .chars()
                 .count(),
             32,
@@ -356,7 +353,7 @@ mod tests {
             ("   ", "DISPLAY_NAME_REQUIRED"),
             (&"x".repeat(33), "DISPLAY_NAME_TOO_LONG"),
         ] {
-            let err = validated_display_name(&Some(raw.to_owned())).unwrap_err();
+            let err = validated_display_name(raw).unwrap_err();
             let AppError::ValidationError(errors) = err else {
                 panic!("expected a validation error, got {err:?}");
             };

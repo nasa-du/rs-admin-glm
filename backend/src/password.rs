@@ -13,6 +13,13 @@ use argon2::{Argon2, PasswordHasher, PasswordVerifier};
 /// Length of a generated initial password (spec §2.4).
 pub const INITIAL_PASSWORD_LEN: usize = 16;
 
+/// Password policy (spec §2.1): 8–128 characters, no composition rules; the
+/// cap protects argon2 from overlong-input DoS. The one home of the bounds —
+/// the change-password endpoint and the seed CLI's explicit-password check
+/// both read them here.
+pub const PASSWORD_MIN_CHARS: usize = 8;
+pub const PASSWORD_MAX_CHARS: usize = 128;
+
 /// 54 glyphs: base-62 minus the eight confusables `0 O o 1 l L I i`.
 const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
 

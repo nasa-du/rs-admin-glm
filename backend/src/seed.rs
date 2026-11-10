@@ -184,10 +184,12 @@ fn validate_email(email: &str) -> Result<()> {
 
 /// Explicit `--password` must respect the 8–128 length policy (spec §2.1):
 /// no composition rules, upper bound caps argon2 work against overlong input.
+/// The bounds themselves live in [`crate::password`], shared with the
+/// change-password endpoint.
 fn validate_explicit_password(password: &str) -> Result<()> {
     let len = password.chars().count();
     ensure!(
-        (8..=128).contains(&len),
+        (crate::password::PASSWORD_MIN_CHARS..=crate::password::PASSWORD_MAX_CHARS).contains(&len),
         "password must be 8–128 characters (got {len})"
     );
     Ok(())

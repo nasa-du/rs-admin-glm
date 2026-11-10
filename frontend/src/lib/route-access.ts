@@ -35,7 +35,7 @@ export const ROUTE_ACCESS = {
   '/': { minRole: 'user' },
   '/users': { minRole: 'admin' },
   '/settings': { minRole: 'user' },
-  '/settings/account': { minRole: 'user' },
+  '/settings/password': { minRole: 'user' },
   '/settings/appearance': { minRole: 'user' },
 } satisfies Record<string, RouteAccess>
 

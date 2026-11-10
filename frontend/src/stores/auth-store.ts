@@ -41,18 +41,23 @@ interface AuthState {
   accessToken: string
   /** Store a successful login / refresh response (wraps the role). */
   setSession: (payload: SessionResponse) => void
+  /** Replace the user after a self-profile edit (`PATCH /users/me`). */
+  setUser: (user: ApiUser) => void
   /** Drop the in-memory session (sign-out, expired refresh). */
   reset: () => void
+}
+
+/** Wrap the backend user's single role into the template's array shape. */
+function toAuthUser(user: ApiUser): AuthUser {
+  return { ...user, role: [user.role] }
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
   user: null,
   accessToken: '',
   setSession: ({ accessToken, user }) =>
-    set({
-      accessToken,
-      user: { ...user, role: [user.role] },
-    }),
+    set({ accessToken, user: toAuthUser(user) }),
+  setUser: (user) => set({ user: toAuthUser(user) }),
   reset: () => set({ user: null, accessToken: '' }),
 }))
 
@@ -66,3 +71,7 @@ export const useCurrentRole = () =>
 
 /** Non-hook accessor for the route guard (which runs outside React). */
 export const getCurrentRole = () => useAuthStore.getState().user?.role[0]
+
+/** Non-hook read of the forced-password-change flag (guard layer 2). */
+export const getMustChangePassword = () =>
+  useAuthStore.getState().user?.mustChangePassword ?? false

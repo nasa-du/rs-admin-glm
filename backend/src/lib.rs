@@ -62,12 +62,14 @@ pub fn app_router(state: AppState, mount_swagger: bool) -> Router {
     let auth_routes = OpenApiRouter::<AppState>::new()
         .routes(routes!(auth::login))
         .routes(routes!(auth::session::refresh))
-        .routes(routes!(auth::session::logout));
+        .routes(routes!(auth::session::logout))
+        .routes(routes!(auth::password::change_password));
 
     let users_routes = OpenApiRouter::<AppState>::new()
         .routes(routes!(users::list, users::create))
         // update and delete share the /users/{id} path; password-reset is
-        // its own path.
+        // its own path. /users/me is static and therefore wins over {id}.
+        .routes(routes!(users::me::update_me))
         .routes(routes!(users::manage::update, users::manage::delete))
         .routes(routes!(users::manage::reset_password));
 

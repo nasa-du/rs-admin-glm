@@ -13,6 +13,7 @@
     "users": "用户管理",
     "settings": "设置",
     "profile": "个人资料",
+    "password": "修改密码",
     "appearance": "外观",
     "signOut": "登出"
   },
@@ -164,6 +165,57 @@
     "nextPage": "下一页",
     "lastPage": "最后一页",
     "goToPage": "转到第 {{page}} 页"
+  },
+  "settings": {
+    "title": "设置",
+    "description": "管理你的资料、密码与界面偏好。",
+    "tabs": {
+      "profile": "个人资料",
+      "password": "修改密码",
+      "appearance": "外观"
+    },
+    "profile": {
+      "title": "个人资料",
+      "description": "这些信息将展示给其他用户。",
+      "displayName": "显示名",
+      "displayNameHint": "1–32 个字符，仅用于界面展示，不用于登录。",
+      "email": "邮箱（登录标识）",
+      "emailHint": "登录标识由管理员管理，不可自行修改。",
+      "submit": "保存资料",
+      "saving": "保存中…",
+      "toasts": {
+        "updated": "资料已保存"
+      }
+    },
+    "password": {
+      "title": "修改密码",
+      "description": "修改密码后所有会话将立即失效，需要重新登录。",
+      "currentPassword": "当前密码",
+      "currentRequired": "请输入当前密码",
+      "newPassword": "新密码",
+      "newRequired": "请输入新密码",
+      "newPasswordHint": "8–128 个字符。",
+      "reloginHint": "修改成功后所有会话（含当前浏览器）将被终止，需使用新密码重新登录。",
+      "forcedTitle": "请先设置自己的新密码",
+      "forcedDescription": "你正在使用一次性初始密码登录。首次登录必须设置新密码，初始密码随即作废。",
+      "submit": "修改密码",
+      "submitting": "修改中…",
+      "toasts": {
+        "changed": "密码已修改，请使用新密码重新登录"
+      }
+    },
+    "appearance": {
+      "title": "外观",
+      "description": "自定义界面的明暗主题与语言偏好。",
+      "theme": "主题",
+      "themeHint": "选择界面的明暗主题，立即生效。",
+      "light": "浅色",
+      "dark": "深色",
+      "font": "字体",
+      "fontHint": "选择界面使用的字体。",
+      "language": "界面语言",
+      "languageHint": "切换后立即生效，浏览器会记住你的选择。"
+    }
   },
   "forbidden": {
     "title": "无权访问",

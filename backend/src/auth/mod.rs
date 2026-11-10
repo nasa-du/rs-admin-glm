@@ -2,12 +2,13 @@
 //!
 //! Login opens a token family; refresh rotates it (reuse detection, family
 //! revocation, fresh user row) and logout revokes the current family
-//! (issue #16). Password change follows in its own ticket. Tokens are an
-//! HS256 access JWT (15 min) plus the opaque `rs_admin_refresh` cookie
-//! (ADR 0001).
+//! (issue #16); password change revokes every family of the user (issue #19).
+//! Tokens are an HS256 access JWT (15 min) plus the opaque `rs_admin_refresh`
+//! cookie (ADR 0001).
 
 pub mod extractor;
 pub mod jwt;
+pub mod password;
 pub mod session;
 pub mod tokens;
 
@@ -26,7 +27,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::password;
+// The two hashing helpers imported by name: the bare `crate::password` import
+// would collide with the `pub mod password` endpoint module below.
+use crate::password::{hash_password, verify_password};
 use crate::state::AppState;
 
 /// The hierarchical single-value role (spec §3): superadmin ⊃ admin ⊃ user.
@@ -141,9 +144,8 @@ impl From<UserRow> for UserDto {
 
 /// A pre-computed hash the unknown-email path verifies against, so response
 /// timing matches the wrong-password path (§4.2 anti-enumeration).
-static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
-    password::hash_password("timing-equalizer").expect("hashing a constant cannot fail")
-});
+static DUMMY_HASH: LazyLock<String> =
+    LazyLock::new(|| hash_password("timing-equalizer").expect("hashing a constant cannot fail"));
 
 /// `POST /auth/login` (spec §4.2): verify password → distinguish the two 401s
 /// by error code → sign access JWT → open a token family → refresh cookie.
@@ -174,14 +176,14 @@ pub async fn login(
     // hash so timing matches the wrong-password path, then answer with the
     // same code — enumeration stays blind (§4.2).
     let Some(user) = fetch_user_by_email(&state.pool, &request.email).await? else {
-        let _ = password::verify_password(&request.password, &DUMMY_HASH);
+        let _ = verify_password(&request.password, &DUMMY_HASH);
         return Err(AppError::InvalidCredentials);
     };
 
     // Password first, enabled second: a wrong password on a disabled account
     // must still read as INVALID_CREDENTIALS (§4.2).
-    let verified = password::verify_password(&request.password, &user.password_hash)
-        .map_err(AppError::Internal)?;
+    let verified =
+        verify_password(&request.password, &user.password_hash).map_err(AppError::Internal)?;
     if !verified {
         return Err(AppError::InvalidCredentials);
     }

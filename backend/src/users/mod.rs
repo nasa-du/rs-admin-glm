@@ -1,11 +1,13 @@
 //! users module — list, create, and the lifecycle closure of update / delete
-//! / password-reset (issues #17–#18, spec §3 / §5.3 / §5.4).
+//! / password-reset (issues #17–#18) plus the self-service `me` endpoint
+//! (issue #19); spec §3 / §5.3 / §5.4.
 //!
 //! `GET /users` is the admin+ server-side list: pagination, sort whitelist,
 //! role / status filters, and fuzzy search over login identifier and display
 //! name. `POST /users` is manage-down creation: the new role must be
 //! strictly below the caller's, so no API call can mint a superadmin. The
-//! `manage` submodule closes the lifecycle with the two spec §3 guardrails.
+//! `manage` submodule closes the lifecycle with the two spec §3 guardrails;
+//! `me` is the no-entanglement self profile (displayName only).
 //!
 //! Authorization reads the role from the JWT claim via [`AuthUser`]; there
 //! is no per-request users lookup (spec §3). The created initial password is
@@ -13,6 +15,7 @@
 //! argon2 PHC hash.
 
 pub mod manage;
+pub mod me;
 pub mod query;
 
 use axum::Json;

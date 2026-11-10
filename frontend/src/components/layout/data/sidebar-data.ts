@@ -1,4 +1,5 @@
 import {
+  KeyRound,
   LayoutDashboard,
   Palette,
   Settings,
@@ -52,6 +53,11 @@ const navGroups: NavGroupDef[] = [
             titleKey: 'nav.profile',
             url: '/settings',
             icon: UserCog,
+          },
+          {
+            titleKey: 'nav.password',
+            url: '/settings/password',
+            icon: KeyRound,
           },
           {
             titleKey: 'nav.appearance',

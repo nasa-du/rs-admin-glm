@@ -48,3 +48,16 @@ export interface ApiErrorBody {
 function isApiError(error: unknown): error is AxiosError<ApiErrorBody> {
   return axios.isAxiosError(error)
 }
+
+/**
+ * Field-level codes of a 422 body as `{field: firstCode}` — the input
+ * `form.setError` consumes. The change-password form lives on this contract:
+ * a wrong current password lands on the field, not as a toast (issue #19).
+ */
+export function getApiFieldErrors(error: unknown): Record<string, string> {
+  if (!isApiError(error)) return {}
+  const errors = error.response?.data?.errors ?? {}
+  return Object.fromEntries(
+    Object.entries(errors).map(([field, codes]) => [field, codes[0]])
+  )
+}

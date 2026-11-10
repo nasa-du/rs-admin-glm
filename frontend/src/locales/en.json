@@ -13,6 +13,7 @@
     "users": "Users",
     "settings": "Settings",
     "profile": "Profile",
+    "password": "Password",
     "appearance": "Appearance",
     "signOut": "Sign out"
   },
@@ -164,6 +165,57 @@
     "nextPage": "Go to next page",
     "lastPage": "Go to last page",
     "goToPage": "Go to page {{page}}"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your profile, password and interface preferences.",
+    "tabs": {
+      "profile": "Profile",
+      "password": "Password",
+      "appearance": "Appearance"
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "This is how others will see you on the site.",
+      "displayName": "Display name",
+      "displayNameHint": "1–32 characters. Display only — never used to sign in.",
+      "email": "Email (login identifier)",
+      "emailHint": "The login identifier is managed by administrators and cannot be changed here.",
+      "submit": "Save profile",
+      "saving": "Saving…",
+      "toasts": {
+        "updated": "Profile saved"
+      }
+    },
+    "password": {
+      "title": "Change password",
+      "description": "Changing your password ends every session immediately; you will need to sign in again.",
+      "currentPassword": "Current password",
+      "currentRequired": "Please enter your current password",
+      "newPassword": "New password",
+      "newRequired": "Please enter a new password",
+      "newPasswordHint": "8–128 characters.",
+      "reloginHint": "On success every session (including this browser) is terminated and you sign in again with the new password.",
+      "forcedTitle": "Please set your own new password first",
+      "forcedDescription": "You signed in with a one-time initial password. You must set a new password at first sign-in; the initial password is void afterwards.",
+      "submit": "Change password",
+      "submitting": "Changing…",
+      "toasts": {
+        "changed": "Password changed. Please sign in again with the new password"
+      }
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize the light/dark theme and the interface language.",
+      "theme": "Theme",
+      "themeHint": "Choose the light or dark theme; it applies immediately.",
+      "light": "Light",
+      "dark": "Dark",
+      "font": "Font",
+      "fontHint": "Choose the font used across the interface.",
+      "language": "Interface language",
+      "languageHint": "Applies immediately; your browser remembers the choice."
+    }
   },
   "forbidden": {
     "title": "Access Forbidden",
