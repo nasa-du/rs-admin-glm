@@ -9,7 +9,7 @@
 - **vitest 组件测试（拒绝）**：shadcn-admin v2.2.1 零测试基建（package.json 无 test script，已核），管理后台 CRUD 组件多为模板已验证代码，ROI 低。axios 拦截器的单飞 refresh + Web Locks 是前端唯一复杂逻辑，暂手测覆盖，出现回归再补单测。
 - **Playwright e2e（拒绝）**：dev 期 Vite proxy 直连后端 + 后端集成测试已近似覆盖同等路径，e2e 的维护成本在这个体量不值。
 - **sqlx 内置 `.sql` fixtures（拒绝）**：RBAC 矩阵与护栏测试的用户组合逐测试不同，Rust seed helper 传参更灵活；标准测试密码的 argon2 哈希预计算为 const，seed 时零哈希开销。
-- **第三方 setup-sqlx action / cargo-binstall（拒绝）**：CI 内 `cargo install sqlx-cli --version 0.9.0 --no-default-features --features rustls` 走官方渠道，接受 2–4 分钟编译，不引入第三方 action 信任面。
+- **第三方 setup-sqlx action / cargo-binstall（拒绝）**：CI 内 `cargo install sqlx-cli --version 0.9.0 --no-default-features --features postgres,rustls` 走官方渠道，接受 2–4 分钟编译，不引入第三方 action 信任面。**勘误（PR #22）**：原文写 `--features rustls`，但 `--no-default-features` 连数据库驱动一并关掉，装出的是不认 `postgres://` 的 CLI（CI 实测报 `no driver found for URL scheme "postgres"`）；须显式带上 `postgres`。
 - **仅 PR 触发、不做 paths 过滤（拒绝）**：main 被破坏要立刻知道；monorepo 下 `backend/**` / `frontend/**` 互不触发可省无谓的 runner 时间。
 
 ## Consequences
