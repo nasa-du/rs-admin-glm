@@ -1,9 +1,12 @@
 # rs-admin-glm
 
+[![backend](https://github.com/nasa-du/rs-admin-glm/actions/workflows/backend.yml/badge.svg?branch=main)](https://github.com/nasa-du/rs-admin-glm/actions/workflows/backend.yml)
+[![frontend](https://github.com/nasa-du/rs-admin-glm/actions/workflows/frontend.yml/badge.svg?branch=main)](https://github.com/nasa-du/rs-admin-glm/actions/workflows/frontend.yml)
+
 rs-admin 管理后台 monorepo：`frontend/`（shadcn-admin v2.2.1 fork 裁剪，TanStack Router + shadcn/ui）
-+ `backend/`（Rust Axum 单 crate，sqlx + PostgreSQL 18）。当前处于 M1 数据层阶段（[#14]）：
-users / refresh_tokens 迁移落库、`seed-superadmin` CLI 冷启动首个超管、AppError 十码错误骨架；
-API 仍未上线——登录为前端 mock，后端 router 无业务端点（auth M2 / users M3 接入）。
++ `backend/`（Rust Axum 单 crate，sqlx + PostgreSQL 18）。登录 / 刷新轮换 / 三档 RBAC /
+用户管理 / 个人设置均已上线（[#15]–[#19]）；CI 双门禁（backend / frontend workflow，paths
+过滤互不触发）见 [#20]。
 
 完整蓝图见 [docs/spec.md](docs/spec.md)，词汇表见 [CONTEXT.md](CONTEXT.md)，决策记录见 [docs/adr/](docs/adr/)。
 
@@ -34,10 +37,12 @@ npm run dev
 
 ## 门禁
 
+本地与 CI 同一套门禁（CI 按 `backend/**` / `frontend/**` 路径分别触发各自 workflow，根级变更两者都跑）：
+
 | 范围 | 命令 |
 |---|---|
-| 后端 | `cd backend && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`（测试需 `docker compose up -d db`，每测试一座临时库） |
-| 前端 | `cd frontend && npm run lint && npm run build`（= eslint + tsc -b + vite build） |
+| 后端 | `cd backend && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`（测试需 `docker compose up -d db`，每测试一座临时库；CI 另跑 `sqlx migrate run` + `prepare --check`） |
+| 前端 | `cd frontend && npm run lint && npm run build && npm run locales:check`（= eslint + tsc -b + vite build + 双语 locale key 对齐） |
 
 ## 目录
 
@@ -49,3 +54,6 @@ docs/       # spec、ADR
 
 [#13]: https://github.com/nasa-du/rs-admin-glm/issues/13
 [#14]: https://github.com/nasa-du/rs-admin-glm/issues/14
+[#15]: https://github.com/nasa-du/rs-admin-glm/pull/15
+[#19]: https://github.com/nasa-du/rs-admin-glm/pull/19
+[#20]: https://github.com/nasa-du/rs-admin-glm/issues/20
