@@ -53,6 +53,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # rust-toolchain.toml pins 1.94; the runner image preinstalls
+      # rustfmt/clippy only for its own default toolchain.
+      - name: Install toolchain components
+        run: rustup component add rustfmt clippy
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend
