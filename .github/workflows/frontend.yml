@@ -1,31 +1,57 @@
 # Frontend gate (issue #20, ADR 0004): eslint + tsc + vite build + the
 # locale key alignment script — the bilingual discipline check from ADR
-# 0002. Triggered by PRs and pushes to main, but only when frontend
-# sources, this workflow file, or root-level files change — a
-# `backend/**`-only change never runs it (and the backend gate ignores
-# `frontend/**` likewise).
+# 0002.
+#
+# The workflow itself triggers on every PR and push to main; a `changes`
+# job decides whether the gate runs. Path rules (frontend sources, this
+# workflow file, or any root-level file — including dotfiles; a
+# `backend/**`-only change skips it, and vice versa) are enforced at the
+# JOB level on purpose: with workflow-level paths filtering, a PR that
+# skips this workflow would leave a required status check hanging on
+# "Expected" forever, so the gate job always reports — success or
+# skipped, and skipped satisfies branch protection.
 name: frontend
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend.yml'
-      - '*' # any root-level file runs both gates (issue #20)
-      - '.gitignore'
   pull_request:
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend.yml'
-      - '*' # any root-level file runs both gates (issue #20)
-      - '.gitignore'
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history: the diff base (PR target branch or the pre-push
+          # commit) must be present locally.
+          fetch-depth: 0
+
+      - id: filter
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            base="origin/${{ github.event.pull_request.base.ref }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          files="$(git diff --name-only "$base" "$GITHUB_SHA" || true)"
+          # An empty diff (unreadable base, e.g. a force push) falls back
+          # to running the gate — never silently skip.
+          if [ -z "$files" ] \
+            || printf '%s\n' "$files" | grep -qE '^(frontend/|\.github/workflows/frontend\.yml$|[^/]+$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   frontend:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
