@@ -1,0 +1,54 @@
+# Frontend gate (issue #20, ADR 0004): eslint + tsc + vite build + the
+# locale key alignment script — the bilingual discipline check from ADR
+# 0002. Triggered by PRs and pushes to main, but only when frontend
+# sources, this workflow file, or root-level files change — a
+# `backend/**`-only change never runs it (and the backend gate ignores
+# `frontend/**` likewise).
+name: frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+      - '*' # any root-level file runs both gates (issue #20)
+      - '.gitignore'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+      - '*' # any root-level file runs both gates (issue #20)
+      - '.gitignore'
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      # package.json build = tsc -b && vite build, so this step is both the
+      # type check and the production build gate.
+      - name: Type-check & build (tsc + vite)
+        run: npm run build
+
+      - name: Locale key alignment
+        run: npm run locales:check
