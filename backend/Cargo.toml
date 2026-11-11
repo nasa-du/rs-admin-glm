@@ -3,11 +3,10 @@ name = "rs-admin-backend"
 version = "0.1.0"
 edition = "2024"
 
-[dev-dependencies]
-# oneshot driving of the assembled router in integration tests (ADR 0004)
-tower = { version = "0.5", features = ["util"] }
-
 [dependencies]
+# oneshot driving of the SPA fallback service inside app_router; also the
+# in-process test seam (ADR 0004)
+tower = { version = "0.5", features = ["util"] }
 # Web framework (spec §0.1: axum 0.8.9)
 axum = "0.8.9"
 # Data layer (spec §0.1: sqlx 0.9.0, locked — no stable patches after 0.9.0)
@@ -21,11 +20,13 @@ sqlx = { version = "0.9.0", features = [
 ] }
 # Runtime
 tokio = { version = "1", features = ["full"] }
-# Middleware: Trace + Timeout + Compression; CORS intentionally NOT configured (ADR 0001)
+# Middleware: Trace + Timeout + Compression + static ServeDir/SPA fallback
+# (spec §9.3); CORS intentionally NOT configured (ADR 0001: same origin)
 tower-http = { version = "0.7.1", features = [
   "trace",
   "timeout",
   "compression-gzip",
+  "fs",
 ] }
 # Observability
 tracing = "0.1"

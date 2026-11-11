@@ -214,11 +214,7 @@ async fn dev_swagger_documents_the_login_endpoint(pool: PgPool) {
 
 #[sqlx::test]
 async fn production_app_mounts_no_swagger(pool: PgPool) {
-    let state = rs_admin_backend::state::AppState {
-        pool,
-        jwt: rs_admin_backend::state::JwtKeys::from_secret(common::JWT_SECRET).unwrap(),
-    };
-    let app = rs_admin_backend::app_router(state, false);
+    let app = rs_admin_backend::app_router(common::test_state(pool), false, None);
 
     for path in ["/api-docs/openapi.json", "/swagger-ui"] {
         let response = app
