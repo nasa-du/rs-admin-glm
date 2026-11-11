@@ -23,8 +23,7 @@
     "user": "User"
   },
   "userStatus": {
-    "enabled": "Enabled",
-    "disabled": "Disabled"
+    "enabled": "Enabled"
   },
   "commandMenu": {
     "placeholder": "Type a command or search...",
@@ -245,5 +244,8 @@
     "SORT_INVALID": "This sort field or direction is not supported",
     "PAGE_INVALID": "Page must be at least 1",
     "PAGE_SIZE_INVALID": "Page size must be between 1 and 100"
+  },
+  "phantom": {
+    "stray": "key"
   }
 }
