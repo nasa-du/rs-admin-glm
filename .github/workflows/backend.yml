@@ -1,24 +1,20 @@
 # Backend gate (issue #20, ADR 0004): fmt → clippy → sqlx migrate + offline
-# prepare check → integration tests against a real Postgres 18. Triggered by
-# PRs and pushes to main, but only when backend sources, this workflow file,
-# or root-level files change — a `frontend/**`-only change never runs it
-# (and the frontend gate ignores `backend/**` likewise).
+# prepare check → integration tests against a real Postgres 18.
+#
+# The workflow itself triggers on every PR and push to main; a `changes`
+# job decides whether the gate runs. Path rules (backend sources, this
+# workflow file, or any root-level file — including dotfiles; a
+# `frontend/**`-only change skips it, and vice versa) are enforced at the
+# JOB level on purpose: with workflow-level paths filtering, a PR that
+# skips this workflow would leave a required status check hanging on
+# "Expected" forever, so the gate job always reports — success or
+# skipped, and skipped satisfies branch protection.
 name: backend
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend.yml'
-      - '*' # any root-level file runs both gates (issue #20)
-      - '.gitignore'
   pull_request:
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend.yml'
-      - '*' # any root-level file runs both gates (issue #20)
-      - '.gitignore'
 
 permissions:
   contents: read
@@ -30,7 +26,37 @@ env:
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/rs_admin
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history: the diff base (PR target branch or the pre-push
+          # commit) must be present locally.
+          fetch-depth: 0
+
+      - id: filter
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            base="origin/${{ github.event.pull_request.base.ref }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          files="$(git diff --name-only "$base" "$GITHUB_SHA" || true)"
+          # An empty diff (unreadable base, e.g. a force push) falls back
+          # to running the gate — never silently skip.
+          if [ -z "$files" ] \
+            || printf '%s\n' "$files" | grep -qE '^(backend/|\.github/workflows/backend\.yml$|[^/]+$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   backend:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
