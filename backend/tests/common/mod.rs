@@ -34,13 +34,18 @@ pub const CSRF_VALUE: &str = "XMLHttpRequest";
 /// not per-test hashing).
 pub const TEST_PASSWORD_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$e9b1BrPWxPjY5E0oH6xP/Q$KSK1haBOn3QzctR3Af+L/UrUFbMvV1i4E+COhFCcxm0";
 
-/// The app exactly as the server serves it in development (Swagger mounted).
-pub fn test_app(pool: PgPool) -> Router {
-    let state = AppState {
+/// The [`AppState`] behind every test shape — one signing secret, one pool.
+pub fn test_state(pool: PgPool) -> AppState {
+    AppState {
         pool,
         jwt: JwtKeys::from_secret(JWT_SECRET).expect("test secret is 32+ bytes"),
-    };
-    app_router(state, true)
+    }
+}
+
+/// The app exactly as the server serves it in development (Swagger mounted,
+/// no static dir — Vite owns the pages on the host).
+pub fn test_app(pool: PgPool) -> Router {
+    app_router(test_state(pool), true, None)
 }
 
 /// Insert a user and return its id. Login identifier, fixed display name and

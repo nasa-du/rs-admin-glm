@@ -1,0 +1,13 @@
+# Keep the image context minimal and secrets out of the image (issue #21).
+# The build needs: backend/{Cargo.toml,Cargo.lock,src,migrations} + frontend/.
+.git
+.github
+.gstack
+docs
+research
+backend/target
+backend/.env
+backend/.sqlx
+frontend/node_modules
+frontend/dist
+**/.env

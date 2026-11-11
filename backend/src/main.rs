@@ -5,7 +5,7 @@
 //! (issue #14 / spec §2.3). Everything downstream — auth (M2), users (M3) —
 //! lives in the library crate and hangs off `rs_admin_backend::app_router`.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anyhow::{Context, Result};
 use axum::Router;
@@ -39,16 +39,37 @@ async fn serve(app_env: &str) -> Result<()> {
     // Swagger only ships outside production (spec §9.2; user story 32).
     let mount_swagger = app_env != "production";
 
+    // Same-origin static serving (spec §9.3): when FRONTEND_DIST points at a
+    // frontend build, the router serves it with SPA fallback beside /api.
+    let frontend_dist = match std::env::var("FRONTEND_DIST") {
+        Ok(path) => {
+            let path = std::path::PathBuf::from(&path);
+            anyhow::ensure!(
+                path.join("index.html").is_file(),
+                "FRONTEND_DIST={path:?} has no index.html — point it at a Vite build output"
+            );
+            Some(path)
+        }
+        Err(_) => None, // development norm: Vite owns the pages
+    };
+
+    // Containers must bind a non-loopback interface to be reachable;
+    // host-side development stays loopback by default.
+    let host: IpAddr = match std::env::var("HOST") {
+        Ok(host) => host
+            .parse()
+            .with_context(|| format!("invalid HOST `{host}` — expected an IP address"))?,
+        Err(_) => Ipv4Addr::LOCALHOST.into(),
+    };
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
 
-    let app: Router = app_router(state, mount_swagger).layer(TraceLayer::new_for_http());
+    let app: Router =
+        app_router(state, mount_swagger, frontend_dist).layer(TraceLayer::new_for_http());
 
-    let addr: SocketAddr = format!("127.0.0.1:{port}")
-        .parse()
-        .with_context(|| format!("invalid bind address for port {port}"))?;
+    let addr = SocketAddr::new(host, port);
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .with_context(|| format!("failed to bind {addr}"))?;

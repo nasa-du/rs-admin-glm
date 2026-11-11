@@ -359,12 +359,14 @@ volumes: { pgdata: {} }
 | `DATABASE_URL` | `postgres://rs_admin:rs_admin@localhost:5432/rs_admin` | 同左（`.env`） |
 | `JWT_SECRET` | ≥32 字节随机（`openssl rand -base64 48`）；生产走 secret 注入 | `.env` |
 | `APP_ENV` | `development` / `production`：tracing 输出（pretty/JSON）、Swagger 挂载开关 | `development` |
+| `HOST` | 监听地址（IP 形式）；容器内须 `0.0.0.0`，宿主开发保持 `127.0.0.1` | `127.0.0.1` |
 | `PORT` | 监听端口 | `3000` |
+| `FRONTEND_DIST` | 前端构建产物目录（含 `index.html`）；设置即开同源静态伺服 + SPA 回退，不设 = Vite 负责页面 | 不设 |
 | `RUST_LOG` | `info,sqlx=warn` 量级 | `info` |
 
 ### 9.3 生产基线
 
-- **同源**（ADR 0001）：多阶段 Dockerfile——node 构建前端 → cargo 构建后端 → 运行镜像内 axum 以 `tower-http` `ServeDir` 伺服 `frontend/dist` + SPA 回退 `index.html`，API 与静态同端口；反代方案等价可选。
-- compose：`db`（postgres:18-alpine，与 CI 对齐）+ `backend`；`JWT_SECRET`/`DATABASE_URL` 走 secret/env 注入。
+- **同源**（ADR 0001）：多阶段 Dockerfile（根 `Dockerfile`，node 构建前端 → cargo 构建后端 → debian-slim 运行镜像）——运行镜像内 axum 以 `tower-http` `ServeDir` 伺服 `/app/frontend-dist` + SPA 回退 `index.html`，API 与静态同端口；未匹配的 `/api` 与 Swagger 路径仍答 JSON 错误体；反代方案等价可选。
+- compose（根 `docker-compose.prod.yml`）：`db`（postgres:18-alpine，与 CI 对齐，不暴露宿主端口）+ `backend`；`JWT_SECRET`/`POSTGRES_PASSWORD` 走 env 注入（缺省报错），`DATABASE_URL` 由 compose 拼装；首位超管 `docker compose -f docker-compose.prod.yml exec backend rs-admin-backend seed-superadmin --email <email>`。
 - 不配 CORS（同源）；Swagger 不挂载（`APP_ENV=production`）。
 - K8s、TLS 终止、备份、监控等超出本基线，属后续运维 effort。

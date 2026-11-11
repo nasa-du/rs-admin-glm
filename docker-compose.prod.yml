@@ -1,0 +1,52 @@
+# Production baseline compose (issue #21, spec §9.3): postgres + the
+# multi-stage image serving frontend and /api same-origin on :3000.
+#
+# Secrets are injected from the environment (or a root .env file, gitignored)
+# — never baked into the image:
+#
+#   JWT_SECRET="$(openssl rand -base64 48)" \
+#   POSTGRES_PASSWORD="$(openssl rand -hex 24)" \
+#     docker compose -f docker-compose.prod.yml up -d --build
+#
+# Then bootstrap the first superadmin (password printed once):
+#
+#   docker compose -f docker-compose.prod.yml exec backend \
+#     rs-admin-backend seed-superadmin --email admin@example.com
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: rs_admin
+      # hex on purpose: URL-safe inside DATABASE_URL below
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD, e.g. openssl rand -hex 24}
+      POSTGRES_DB: rs_admin
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rs_admin -d rs_admin"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    # no host ports: the database lives on the compose network only
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATABASE_URL: postgres://rs_admin:${POSTGRES_PASSWORD}@db:5432/rs_admin
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET, e.g. openssl rand -base64 48}
+      RUST_LOG: info,sqlx=warn
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata: {}

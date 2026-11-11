@@ -12,19 +12,38 @@ pub mod seed;
 pub mod state;
 pub mod users;
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use axum::Router;
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use axum::response::IntoResponse;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::{compression::CompressionLayer, timeout::TimeoutLayer};
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use crate::state::AppState;
+
+/// Mask the password of a `scheme://user:password@host/...` URL for logging.
+/// URLs without credentials pass through; a password containing a literal
+/// `@` over-redacts (safer than the alternative of leaking).
+fn redact_credentials(url: &str) -> String {
+    let Some(scheme_end) = url.find("://") else {
+        return url.to_owned();
+    };
+    let rest = &url[scheme_end + 3..];
+    let Some(at) = rest.rfind('@') else {
+        return url.to_owned();
+    };
+    let user = rest[..at].split(':').next().unwrap_or("");
+    format!("{}://{}:***{}", &url[..scheme_end], user, &rest[at..])
+}
 
 /// The shared startup path of both faces: resolve `DATABASE_URL`, connect the
 /// pool, apply migrations. Idempotent, so the server and the seed CLI can
@@ -37,8 +56,13 @@ pub async fn bootstrap() -> Result<PgPool> {
     let pool = PgPoolOptions::new()
         .connect(&database_url)
         .await
-        .with_context(|| format!("failed to connect to Postgres ({database_url})"))?;
-    tracing::info!(%database_url, "postgres connection pool established");
+        .with_context(|| {
+            format!(
+                "failed to connect to Postgres ({})",
+                redact_credentials(&database_url)
+            )
+        })?;
+    tracing::info!(database_url = %redact_credentials(&database_url), "postgres connection pool established");
 
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -53,7 +77,13 @@ pub async fn bootstrap() -> Result<PgPool> {
 ///
 /// `mount_swagger` wires Swagger UI + the OpenAPI document — development
 /// only (spec §9.2: `APP_ENV=production` mounts nothing).
-pub fn app_router(state: AppState, mount_swagger: bool) -> Router {
+///
+/// `frontend_dist` switches the fallback to same-origin static serving
+/// (spec §9.3, issue #21): `ServeDir` over the frontend build with an SPA
+/// fallback to `index.html`, so pages and `/api` share one port with no
+/// CORS. `None` (the development norm) keeps Vite as the page server and
+/// the fallback a plain JSON 404.
+pub fn app_router(state: AppState, mount_swagger: bool, frontend_dist: Option<PathBuf>) -> Router {
     // Endpoint registration happens per module; OpenApiRouter::nest folds the
     // /api prefix into both the routes and the OpenAPI paths (spec §5.1), so
     // the document names real URLs.
@@ -78,10 +108,38 @@ pub fn app_router(state: AppState, mount_swagger: bool) -> Router {
         .nest("/api", users_routes)
         .split_for_parts();
 
-    let app = router.with_state(state).fallback(|| async {
-        // Unmatched paths already speak the §5.2 error body.
-        crate::error::AppError::NotFound
-    });
+    let app = match frontend_dist {
+        Some(dist) => {
+            // Real files win; anything else re-enters the app through
+            // index.html so client-side routes survive a hard refresh.
+            // `.fallback` (not `not_found_service`) keeps the shell a 200 —
+            // `not_found_service` would relabel the same body as a 404.
+            let spa = ServeDir::new(&dist).fallback(ServeFile::new(dist.join("index.html")));
+            router
+                .with_state(state)
+                .fallback(move |request: Request<Body>| {
+                    let spa = spa.clone();
+                    async move {
+                        match fallback_kind(request.uri().path()) {
+                            // The SPA catch-all must not mask the API contract or
+                            // a disabled Swagger: those paths answer the §5.2
+                            // error body, never index.html.
+                            FallbackKind::Error404 => {
+                                crate::error::AppError::NotFound.into_response()
+                            }
+                            FallbackKind::Spa => {
+                                use tower::ServiceExt;
+                                spa.oneshot(request).await.into_response()
+                            }
+                        }
+                    }
+                })
+        }
+        None => router.with_state(state).fallback(|| async {
+            // Unmatched paths already speak the §5.2 error body.
+            crate::error::AppError::NotFound
+        }),
+    };
 
     let app = app
         .layer(TimeoutLayer::with_status_code(
@@ -92,10 +150,38 @@ pub fn app_router(state: AppState, mount_swagger: bool) -> Router {
 
     if mount_swagger {
         return app.merge(
-            utoipa_swagger_ui::SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi),
+            utoipa_swagger_ui::SwaggerUi::new(SWAGGER_UI_PATH)
+                .url(format!("{API_DOCS_PREFIX}/openapi.json"), openapi),
         );
     }
     app
+}
+
+/// Where Swagger UI and the OpenAPI document mount in development (spec
+/// §9.2) — and the exact prefixes [`fallback_kind`] keeps on the JSON error
+/// contract when they are not mounted (`APP_ENV=production`).
+const SWAGGER_UI_PATH: &str = "/swagger-ui";
+const API_DOCS_PREFIX: &str = "/api-docs";
+
+/// Which side of the same-origin fallback a path belongs to.
+enum FallbackKind {
+    /// Keep the §5.2 JSON error body: unmatched `/api` paths, plus the
+    /// Swagger paths when Swagger is not mounted (`APP_ENV=production`
+    /// must 404 there, not serve the SPA shell — issue #21).
+    Error404,
+    /// Everything else is frontend territory.
+    Spa,
+}
+
+fn fallback_kind(path: &str) -> FallbackKind {
+    // Literal-prefix matching only: axum never normalizes `..`, and
+    // ServeDir refuses traversal itself, so no path can dodge into /api.
+    for prefix in ["/api", SWAGGER_UI_PATH, API_DOCS_PREFIX] {
+        if path == prefix || path.starts_with(&format!("{prefix}/")) {
+            return FallbackKind::Error404;
+        }
+    }
+    FallbackKind::Spa
 }
 
 /// `RUST_LOG` when set, otherwise `info,sqlx=warn` (spec §9.2).
@@ -115,5 +201,64 @@ pub fn init_tracing(app_env: &str) {
             .with(filter)
             .with(fmt::layer().pretty())
             .init(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Startup logs must never carry the database password (it sits in
+    /// DATABASE_URL, which used to be logged verbatim — an issue the
+    /// production baseline made visible, issue #21).
+    #[test]
+    fn redact_credentials_hides_the_password() {
+        let url = "postgres://rs_admin:s3cret-pw@db:5432/rs_admin";
+        assert_eq!(
+            redact_credentials(url),
+            "postgres://rs_admin:***@db:5432/rs_admin"
+        );
+        // no credentials → unchanged; trailing @ in a password over-redacts
+        // rather than leaking
+        assert_eq!(
+            redact_credentials("postgres://localhost:5432/db"),
+            "postgres://localhost:5432/db"
+        );
+        assert_eq!(
+            redact_credentials("postgres://u:p@ss@host/db"),
+            "postgres://u:***@host/db"
+        );
+    }
+
+    /// The SPA fallback's one rule: API- and Swagger-shaped paths keep the
+    /// JSON error contract; everything else is frontend territory.
+    #[test]
+    fn fallback_kind_splits_api_and_swagger_from_the_spa() {
+        for path in [
+            "/api",
+            "/api/",
+            "/api/nope",
+            "/api/auth/login",
+            "/swagger-ui",
+            "/swagger-ui/",
+            "/api-docs/openapi.json",
+        ] {
+            assert!(
+                matches!(fallback_kind(path), FallbackKind::Error404),
+                "{path} must keep the error contract"
+            );
+        }
+        for path in [
+            "/",
+            "/users",
+            "/settings/profile",
+            "/apifoo",
+            "/assets/app.js",
+        ] {
+            assert!(
+                matches!(fallback_kind(path), FallbackKind::Spa),
+                "{path} belongs to the SPA"
+            );
+        }
     }
 }
