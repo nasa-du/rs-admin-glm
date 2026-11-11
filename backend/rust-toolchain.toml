@@ -1,3 +1,7 @@
 # Spec §0.1: Rust >= 1.94 (sqlx 0.9 requirement). Pinned per-repo so dev/CI agree.
+# Components are declared so rustup provisions them with the toolchain —
+# dev machines and CI runners (which preinstall rustfmt/clippy only for
+# their own default toolchain) get identical setups.
 [toolchain]
 channel = "1.94"
+components = ["rustfmt", "clippy"]
