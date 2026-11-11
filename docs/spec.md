@@ -29,7 +29,7 @@ fork [satnaing/shadcn-admin](https://github.com/satnaing/shadcn-admin) v2.2.1 �
 ### 0.2 实现期防坑清单（来自 #8 调研，均已核实）
 
 - sqlx 0.9 动态拼接 SQL 须包 `AssertSqlSafe`。
-- sqlx-cli 安装**不带 `--locked`**（0.9 仓库无 Cargo.lock）：`cargo install sqlx-cli --version 0.9.0 --no-default-features --features rustls`。
+- sqlx-cli 安装**不带 `--locked`**（0.9 仓库无 Cargo.lock）：`cargo install sqlx-cli --version 0.9.0 --no-default-features --features postgres,rustls`。**勘误（PR #22）**：原命令漏 `postgres`，`--no-default-features` 下装出无驱动的 CLI，详见 ADR 0004 勘误。
 - argon2 0.6 API：`SaltString::generate()` 不再收 RNG 参数，`hash_password` 自动加盐——勿照抄 0.5 旧教程。
 - 同一 binary 的 TLS crypto provider 保持全局一致（sqlx 的 rustls 与其它 crate 的 ring / aws-lc-rs 不混用）。
 - 参考样板：`nakamuraos/axum-postgres-boilerplate`（axum 0.8.9 + JWT + RBAC + utoipa，与本栈同构）；官方 `sqlx-postgres`、`tracing-aka-logging` 示例。**勿用** `realworld-axum-sqlx`（停更于 axum 0.3）与 `zero-to-production`（actix-web）。

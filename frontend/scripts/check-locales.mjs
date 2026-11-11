@@ -1,6 +1,6 @@
-// Locale key alignment gate (issue #20, ADR 0002 / ADR 0004): the zh-CN and
-// en locale files must carry the exact same key set, so bilingual copy stays
-// in lockstep. Zero-dependency on purpose — it runs in CI (frontend
+// Locale key alignment gate (issue #20, ADR 0002 / ADR 0004): every locale
+// file must carry the exact same key set as its siblings, so bilingual copy
+// stays in lockstep. Zero-dependency on purpose — it runs in CI (frontend
 // workflow) with no toolchain beyond Node itself.
 //
 // Exit codes: 0 when the key sets match, 1 on any divergence (or on a
@@ -42,32 +42,36 @@ function loadKeys(locale) {
 
 const keysByLocale = new Map(LOCALES.map((locale) => [locale, loadKeys(locale)]))
 
+// All key sets must be identical, so diffing every file against the first
+// is sufficient — and a locale added to LOCALES later joins the gate as a
+// pure files-only change (ADR 0002).
+const [reference, ...others] = LOCALES
+const referenceKeys = keysByLocale.get(reference)
+
 let diverged = false
-for (const [locale, other] of [
-  ['zh-CN', 'en'],
-  ['en', 'zh-CN'],
-]) {
-  const gaps = [...keysByLocale.get(locale)]
-    .filter((key) => !keysByLocale.get(other).has(key))
-    .sort()
-  if (gaps.length > 0) {
+for (const locale of others) {
+  const localeKeys = keysByLocale.get(locale)
+  const report = (from, to, keys) => {
+    if (keys.length === 0) return
     diverged = true
     console.error(
-      `locale-check: ${gaps.length} key(s) present in ${locale}.json but missing from ${other}.json:`
+      `locale-check: ${keys.length} key(s) present in ${from}.json but missing from ${to}.json:`
     )
-    for (const key of gaps) {
+    for (const key of keys) {
       console.error(`  ${key}`)
     }
   }
+  report(locale, reference, [...localeKeys].filter((k) => !referenceKeys.has(k)).sort())
+  report(reference, locale, [...referenceKeys].filter((k) => !localeKeys.has(k)).sort())
 }
 
 if (diverged) {
   console.error(
-    'locale-check: key sets diverge — add the missing keys to both files in the same commit (ADR 0002).'
+    'locale-check: key sets diverge — add the missing keys to every locale file in the same commit (ADR 0002).'
   )
   process.exit(1)
 }
 
 console.log(
-  `locale-check: zh-CN and en key sets aligned (${keysByLocale.get('zh-CN').size} keys)`
+  `locale-check: ${LOCALES.join(' / ')} key sets aligned (${referenceKeys.size} keys)`
 )
