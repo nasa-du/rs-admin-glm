@@ -1,0 +1,93 @@
+# Backend gate (issue #20, ADR 0004): fmt → clippy → sqlx migrate + offline
+# prepare check → integration tests against a real Postgres 18. Triggered by
+# PRs and pushes to main, but only when backend sources, this workflow file,
+# or root-level files change — a `frontend/**`-only change never runs it
+# (and the frontend gate ignores `backend/**` likewise).
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+      - '*' # any root-level file runs both gates (issue #20)
+      - '.gitignore'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+      - '*' # any root-level file runs both gates (issue #20)
+      - '.gitignore'
+
+permissions:
+  contents: read
+
+env:
+  # The service container below. #[sqlx::test] creates its per-test temp
+  # databases on this server; sqlx migrate run applies migrations to the
+  # base database first.
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/rs_admin
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rs_admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      # rust-toolchain.toml pins 1.94; the runner image preinstalls
+      # rustfmt/clippy only for its own default toolchain.
+      - name: Install toolchain components
+        run: rustup component add rustfmt clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+          # The key reacts to the offline query cache the day compile-time
+          # macros appear (ADR 0004); this crate is runtime-query only so
+          # far, so the hash is empty for now.
+          key: sqlx-${{ hashFiles('backend/.sqlx/**') }}
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # sqlx-cli pinned to the sqlx version in Cargo.toml (0.9.0). No
+      # --locked (ADR 0004); `postgres,rustls` because --no-default-features
+      # drops the bundled database drivers — `rustls` alone builds a CLI
+      # that rejects postgres:// URLs (ADR 0004 erratum, PR #22).
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --version 0.9.0 --no-default-features --features postgres,rustls
+
+      - name: Apply migrations
+        run: cargo sqlx migrate run
+
+      # Fails when the committed .sqlx cache would differ from what the
+      # macros produce — once macros exist, this is the "no developer
+      # database needed to build" guarantee (SQLX_OFFLINE). Today the crate
+      # has no compile-time macros, so this is trivially green.
+      - name: Check offline query cache
+        run: cargo sqlx prepare --check
+
+      - name: Test
+        run: cargo test
